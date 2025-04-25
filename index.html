@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid Diagram Viewer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Mermaid Class Diagram Viewer</h1>
+        <div class="controls">
+            <label for="darkModeToggle">Dark Mode</label>
+            <input type="checkbox" id="darkModeToggle">
+        </div>
+        <textarea id="mermaidInput" rows="15" placeholder="Enter Mermaid classDiagram syntax here..."></textarea>
+        <div id="mermaidOutput" class="mermaid">
+            <!-- Mermaid diagram will be rendered here -->
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html> 

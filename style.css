@@ -1,0 +1,102 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+body.dark-mode {
+    background-color: #333;
+    color: #f4f4f4;
+}
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.controls {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 1rem;
+}
+
+body.dark-mode textarea {
+    background-color: #444;
+    color: #f0f0f0;
+    border-color: #666;
+}
+
+#mermaidOutput {
+    border: 1px solid #ccc;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 4px;
+    min-height: 91vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: auto;
+}
+
+body.dark-mode #mermaidOutput {
+    background-color: #2a2a2a;
+    border-color: #666;
+}
+
+/* Basic Mermaid styling for dark mode */
+body.dark-mode .mermaid svg {
+    /* You might need more specific selectors depending on Mermaid's output */
+    color: #f4f4f4;
+}
+
+body.dark-mode .mermaid .label {
+    color: #f4f4f4 !important; /* Force label color */
+}
+
+body.dark-mode .mermaid .actor,
+body.dark-mode .mermaid .node rect,
+body.dark-mode .mermaid .node circle,
+body.dark-mode .mermaid .node ellipse,
+body.dark-mode .mermaid .node polygon,
+body.dark-mode .mermaid .node path {
+    fill: #444;
+    stroke: #ccc;
+}
+
+body.dark-mode .mermaid .edgePath path {
+    stroke: #ccc;
+}
+
+body.dark-mode .mermaid .marker {
+    fill: #ccc;
+    stroke: #ccc;
+}
+
+body.dark-mode .mermaid .cluster rect {
+    fill: #3a3a3a !important;
+    stroke: #aaa !important;
+}
+
+body.dark-mode .mermaid .cluster text {
+    fill: #f4f4f4 !important;
+} 
