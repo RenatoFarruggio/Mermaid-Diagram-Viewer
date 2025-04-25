@@ -46,16 +46,55 @@ body.dark-mode textarea {
     border-color: #666;
 }
 
+.instructions {
+    background-color: #f0f8ff;
+    border: 1px solid #b8d8ff;
+    border-radius: 4px;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+}
+
+body.dark-mode .instructions {
+    background-color: #2c3e50;
+    border-color: #34495e;
+}
+
+.instructions ul {
+    margin: 5px 0;
+    padding-left: 25px;
+}
+
+.instructions li {
+    margin-bottom: 3px;
+}
+
+.key {
+    display: inline-block;
+    background-color: #e9e9e9;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.85rem;
+    font-family: monospace;
+}
+
+body.dark-mode .key {
+    background-color: #444;
+    border-color: #555;
+}
+
 #mermaidOutput {
     border: 1px solid #ccc;
     padding: 20px;
     background-color: #fff;
     border-radius: 4px;
-    min-height: 91vh;
+    min-height: 800px;
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow: auto;
+    overflow: hidden;
+    position: relative;
 }
 
 body.dark-mode #mermaidOutput {
@@ -63,9 +102,39 @@ body.dark-mode #mermaidOutput {
     border-color: #666;
 }
 
+/* Make sure SVG takes up full space */
+#mermaidOutput svg {
+    width: 100%;
+    height: 100%;
+    cursor: default;
+}
+
+/* Set cursor for draggable nodes */
+#mermaidOutput g.node {
+    cursor: move;
+}
+
+/* When dragging, highlight the node */
+#mermaidOutput g.node.dragging rect,
+#mermaidOutput g.node.dragging circle,
+#mermaidOutput g.node.dragging ellipse,
+#mermaidOutput g.node.dragging polygon {
+    filter: drop-shadow(0 0 5px rgba(0, 120, 255, 0.7));
+    stroke-width: 2px;
+    stroke: #0078ff;
+}
+
+/* Show hand cursor for right-click panning */
+#mermaidOutput svg.svg-pan-zoom_viewport {
+    cursor: grab;
+}
+
+#mermaidOutput svg.svg-pan-zoom_viewport:active {
+    cursor: grabbing;
+}
+
 /* Basic Mermaid styling for dark mode */
 body.dark-mode .mermaid svg {
-    /* You might need more specific selectors depending on Mermaid's output */
     color: #f4f4f4;
 }
 
@@ -99,4 +168,12 @@ body.dark-mode .mermaid .cluster rect {
 
 body.dark-mode .mermaid .cluster text {
     fill: #f4f4f4 !important;
+}
+
+/* For node dragging - highlight nodes on hover */
+#mermaidOutput g.node:hover rect,
+#mermaidOutput g.node:hover circle,
+#mermaidOutput g.node:hover ellipse,
+#mermaidOutput g.node:hover polygon {
+    filter: brightness(1.1);
 } 

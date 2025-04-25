@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mermaid Diagram Viewer</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -14,6 +15,14 @@
             <input type="checkbox" id="darkModeToggle">
         </div>
         <textarea id="mermaidInput" rows="15" placeholder="Enter Mermaid classDiagram syntax here..."></textarea>
+        <div class="instructions">
+            <p><strong>Interactions:</strong></p>
+            <ul>
+                <li><span class="key">Left Click + Drag</span> on a class node to move it</li>
+                <li><span class="key">Right Click + Drag</span> on the diagram to pan</li>
+                <li><span class="key">Mouse Wheel</span> to zoom in/out</li>
+            </ul>
+        </div>
         <div id="mermaidOutput" class="mermaid">
             <!-- Mermaid diagram will be rendered here -->
         </div>
