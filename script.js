@@ -121,53 +121,73 @@ const makeNodesDraggable = () => {
 
 // Analyze edges and store connection info
 function analyzeEdges(svg) {
-    const edges = svg.querySelectorAll('g.edgePath');
-    const nodes = svg.querySelectorAll('g.node');
+    edgeConnections.clear(); // Ensure we start fresh
+    console.log("--- Analyzing Edges --- Firing analyseEdges ---");
     
-    // Create a map of node IDs to node elements
+    // Get nodes first
+    const nodes = svg.querySelectorAll('g.node');
     const nodeMap = new Map();
-    nodes.forEach(node => {
-        const classes = node.getAttribute('class').split(' ');
-        // Find class that might contain node ID
-        for (const cls of classes) {
-            if (cls.includes('classId-')) {
-                nodeMap.set(cls, node);
-                break;
-            }
+    console.log(`Found ${nodes.length} potential node elements (g.node)`);
+    nodes.forEach((node, index) => {
+        const nodeId = node.id;
+        if (nodeId) {
+            console.log(`  Node ${index}: Found ID: ${nodeId}`);
+            nodeMap.set(nodeId, node);
         }
     });
-    
-    // Analyze edge paths to find connection points
-    edges.forEach(edge => {
+    console.log(`Mapped ${nodeMap.size} nodes based on their IDs.`);
+
+    // Get edge paths - they're direct children of g.edgePaths
+    const edgePathsGroup = svg.querySelector('g.edgePaths');
+    if (!edgePathsGroup) {
+        console.warn("No edgePaths group found in SVG");
+        return;
+    }
+
+    const edges = edgePathsGroup.querySelectorAll('path');
+    console.log(`Found ${edges.length} edge paths`);
+
+    edges.forEach((edge, index) => {
         const edgeId = edge.id;
-        const paths = edge.querySelectorAll('path');
-        
-        if (paths.length > 0) {
-            // Try to find connected nodes
-            const classes = edge.getAttribute('class').split(' ');
-            const sourceNodeClass = classes.find(cls => cls.includes('classId-') && cls.includes('from'));
-            const targetNodeClass = classes.find(cls => cls.includes('classId-') && cls.includes('to'));
-            
-            // Extract just the classId part
-            const sourceNodeId = sourceNodeClass ? sourceNodeClass.split('-from-')[0] : null;
-            const targetNodeId = targetNodeClass ? targetNodeClass.split('-to-')[0] : null;
-            
+        console.log(`Analyzing Edge ${index}: ID='${edgeId}'`);
+
+        // Extract source and target from the ID (format: id_Animal_Dog_1)
+        const idParts = edgeId.split('_');
+        if (idParts.length >= 3) {
+            const sourceName = idParts[1]; // e.g., "Animal"
+            const targetName = idParts[2]; // e.g., "Dog"
+
+            // Find the corresponding node IDs
+            const sourceNodeId = Array.from(nodeMap.keys()).find(id => id.includes(sourceName));
+            const targetNodeId = Array.from(nodeMap.keys()).find(id => id.includes(targetName));
+
+            console.log(`  Extracted from ID: ${sourceName} -> ${targetName}`);
+            console.log(`  Found node IDs: ${sourceNodeId} -> ${targetNodeId}`);
+
             if (sourceNodeId && targetNodeId) {
                 const sourceNode = nodeMap.get(sourceNodeId);
                 const targetNode = nodeMap.get(targetNodeId);
-                
+
                 if (sourceNode && targetNode) {
-                    // Store connection info
+                    console.log(`  SUCCESS: Linked edge ${edgeId} from ${sourceNodeId} to ${targetNodeId}`);
                     edgeConnections.set(edgeId, {
                         edge: edge,
                         source: sourceNode,
                         target: targetNode,
-                        paths: Array.from(paths)
+                        paths: [edge] // The path itself is the main path
                     });
+                } else {
+                    console.warn(`  WARN: Found source/target IDs (${sourceNodeId}, ${targetNodeId}) for edge ${edgeId}, but couldn't find matching nodes.`);
                 }
+            } else {
+                console.warn(`  WARN: Could not find matching node IDs for edge ${edgeId}`);
             }
+        } else {
+            console.warn(`  WARN: Edge ID ${edgeId} does not match expected format`);
         }
     });
+
+    console.log(`--- Edge analysis complete. ${edgeConnections.size} connections stored. ---`);
 }
 
 // Node dragging handlers
@@ -247,57 +267,16 @@ function handleNodeMouseUp() {
 
 // More robust edge update function
 function updateConnectedEdges(node) {
-    if (!node) return;
-    
+    if (!node || !node.id) return;
+    console.log(`Updating edges connected to node: ${node.id}`);
+
     // Find all edges connected to this node
     edgeConnections.forEach((connection, edgeId) => {
         if (connection.source === node || connection.target === node) {
+            console.log(`  -> Updating edge: ${edgeId}`);
             updateEdgePosition(connection);
         }
     });
-}
-
-// Update edge position based on node positions
-function updateEdgePosition(connection) {
-    const { edge, source, target, paths } = connection;
-    if (!edge || !source || !target || !paths || paths.length === 0) return;
-    
-    // Get source and target positions
-    const sourceRect = source.getBBox();
-    const targetRect = target.getBBox();
-    
-    // Get transforms
-    const sourceTransform = getNodeTransform(source);
-    const targetTransform = getNodeTransform(target);
-    
-    // Calculate centers
-    const sourceCenter = {
-        x: sourceRect.x + sourceRect.width / 2 + sourceTransform.x,
-        y: sourceRect.y + sourceRect.height / 2 + sourceTransform.y
-    };
-    
-    const targetCenter = {
-        x: targetRect.x + targetRect.width / 2 + targetTransform.x,
-        y: targetRect.y + targetRect.height / 2 + targetTransform.y
-    };
-    
-    // Update the main path
-    if (paths.length > 0) {
-        const mainPath = paths[0]; // Usually the first path is the main one
-        
-        // For simplicity, create a straight line between centers
-        // A more complex implementation would consider the shape boundaries
-        const dAttr = `M${sourceCenter.x},${sourceCenter.y} L${targetCenter.x},${targetCenter.y}`;
-        mainPath.setAttribute('d', dAttr);
-        
-        // If there are marker paths (arrowheads), update those too
-        if (paths.length > 1) {
-            for (let i = 1; i < paths.length; i++) {
-                // This is a simple approach - ideally you'd calculate proper arrowhead positions
-                paths[i].setAttribute('transform', `translate(${targetCenter.x},${targetCenter.y})`);
-            }
-        }
-    }
 }
 
 // Helper to get a node's transform values
@@ -313,6 +292,112 @@ function getNodeTransform(node) {
     }
     
     return { x: 0, y: 0 };
+}
+
+// Helper function to calculate potential connection points on a node's boundary
+function getTransformedBoundaryPoints(rect, transform) {
+    // Center point
+    const center = {
+        x: rect.x + rect.width / 2 + transform.x,
+        y: rect.y + rect.height / 2 + transform.y
+    };
+    // Mid-points of the rectangle's sides
+    const midTop = { x: center.x, y: rect.y + transform.y };
+    const midBottom = { x: center.x, y: rect.y + rect.height + transform.y };
+    const midLeft = { x: rect.x + transform.x, y: center.y };
+    const midRight = { x: rect.x + rect.width + transform.x, y: center.y };
+
+    return {
+        center: center,
+        // Use boundary points, plus center as a fallback
+        boundaries: [midTop, midBottom, midLeft, midRight, center]
+    };
+}
+
+// Update edge position based on node positions using boundary points
+function updateEdgePosition(connection) {
+    const { edge, source, target, paths } = connection;
+    if (!edge || !source || !target || !paths || paths.length === 0) {
+        console.error("updateEdgePosition: Missing required connection data.", connection);
+        return;
+    }
+
+    console.log(`  Updating position for edge between ${source.id} and ${target.id}`);
+
+    // Get transforms
+    const sourceTransform = getNodeTransform(source);
+    const targetTransform = getNodeTransform(target);
+    console.log(`    Source Transform:`, sourceTransform);
+    console.log(`    Target Transform:`, targetTransform);
+
+    // Get *untransformed* bounding boxes
+    const sourceRect = source.getBBox();
+    const targetRect = target.getBBox();
+    console.log(`    Source BBox:`, sourceRect);
+    console.log(`    Target BBox:`, targetRect);
+
+    // Calculate potential connection points on boundaries
+    const sourcePoints = getTransformedBoundaryPoints(sourceRect, sourceTransform);
+    const targetPoints = getTransformedBoundaryPoints(targetRect, targetTransform);
+
+    // Find the pair of boundary points (one on source, one on target)
+    // that are closest to each other.
+    let minDistSq = Infinity;
+    let closestSourcePoint = sourcePoints.center;
+    let closestTargetPoint = targetPoints.center;
+
+    for (const sp of sourcePoints.boundaries) {
+        for (const tp of targetPoints.boundaries) {
+            const dx = sp.x - tp.x;
+            const dy = sp.y - tp.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < minDistSq) {
+                minDistSq = distSq;
+                closestSourcePoint = sp;
+                closestTargetPoint = tp;
+            }
+        }
+    }
+    console.log(`    Closest Points: Source=`, closestSourcePoint, `Target=`, closestTargetPoint);
+
+    // Update the main path (assuming it's the first path element for now)
+    // More robust: Identify path by lack of marker attribute?
+    const mainPath = paths.find(p => !p.hasAttribute('marker-end') && !p.hasAttribute('marker-start')) || paths[0];
+    if (!mainPath) {
+        console.error("  Could not find main path element for edge.");
+        return;
+    }
+    const dAttr = `M${closestSourcePoint.x},${closestSourcePoint.y} L${closestTargetPoint.x},${closestTargetPoint.y}`;
+    mainPath.setAttribute('d', dAttr);
+    console.log(`    Set main path 'd': ${dAttr}`);
+
+    // Update markers (arrowheads, etc.)
+    const markerPath = paths.find(p => p.hasAttribute('marker-end') || p.hasAttribute('marker-start'));
+    if (markerPath) {
+        const dx = closestTargetPoint.x - closestSourcePoint.x;
+        const dy = closestTargetPoint.y - closestSourcePoint.y;
+        const angle = (dx === 0 && dy === 0) ? 0 : Math.atan2(dy, dx) * (180 / Math.PI);
+
+        // Determine which end the marker is on
+        let targetPointForMarker = closestTargetPoint; // Assume marker-end
+        if (markerPath.hasAttribute('marker-start')) {
+            targetPointForMarker = closestSourcePoint;
+             // Adjust angle if marker is at the start (points away from target)
+             // angle += 180; // Rotation handles directionality, but position is key
+        }
+
+        const markerTransform = `translate(${targetPointForMarker.x}, ${targetPointForMarker.y}) rotate(${angle})`;
+        markerPath.setAttribute('transform', markerTransform);
+        console.log(`    Set marker path transform: ${markerTransform}`);
+
+    } else {
+        console.log("    No marker path found for this edge.");
+        // Check if there are other paths that aren't the main one
+        const otherPaths = paths.filter(p => p !== mainPath);
+        if(otherPaths.length > 0) {
+            console.log(`    Note: Found ${otherPaths.length} other path(s) associated with the edge that were not identified as main or marker.`);
+        }
+    }
 }
 
 // Function to render the Mermaid diagram
