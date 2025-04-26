@@ -63,15 +63,35 @@ const initializePanZoom = () => {
         svg.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
     }
 
-    // Panning
+    // Panning state - needs to be accessible by the listener
     let isPanning = false;
+
     svg.addEventListener('mousedown', (e) => {
-        if (e.button === 2) isPanning = true;
+        // Check if right button AND the click is NOT on a node or its children
+        if (e.button === 2 && !e.target.closest('g.node')) {
+             isPanning = true;
+             // Optional: Add class for cursor styling if needed
+             // svg.classList.add('panning-active');
+        } else {
+            isPanning = false; // Ensure panning is off if conditions not met
+        }
     });
-    svg.addEventListener('mouseup', () => isPanning = false);
-    svg.addEventListener('mouseleave', () => isPanning = false);
-    
-    // Create new instance
+    svg.addEventListener('mouseup', () => {
+        if (isPanning) {
+            isPanning = false;
+            // Optional: Remove class on mouse up
+            // svg.classList.remove('panning-active');
+        }
+    });
+    svg.addEventListener('mouseleave', () => {
+         if (isPanning) {
+             isPanning = false;
+            // Optional: Remove class on mouse leave
+            // svg.classList.remove('panning-active');
+         }
+    });
+
+    // Create new instance, using the isPanning flag in beforePan
     panZoomInstance = svgPanZoom(svg, {
         zoomEnabled: true,
         controlIconsEnabled: false,
@@ -82,11 +102,11 @@ const initializePanZoom = () => {
         zoomScaleSensitivity: 0.3,
         mouseWheelZoomEnabled: true,
         dblClickZoomEnabled: false,
-        eventsListenerElement: svg.parentNode,
-        beforePan: () => isPanning
+        eventsListenerElement: svg.parentNode, // Use parent for events
+        beforePan: () => isPanning // Control panning based on our flag
     });
     
-    // Prevent context menu on right-click
+    // Prevent the default context menu on the SVG element for all right-clicks
     svg.addEventListener('contextmenu', e => {
         e.preventDefault();
         return false;
@@ -432,12 +452,14 @@ function findIntersection(rect, fromX, fromY, toX, toY) {
 
 // Node dragging handlers
 function handleNodeMouseDown(e) {
-    // Only respond to left mouse button (button 0)
-    if (e.button !== 0) return;
-    
-    // Prevent SVG pan-zoom from interfering
+    // Only respond to RIGHT mouse button (button 2)
+    if (e.button !== 2) return;
+
+    // Prevent the default context menu when right-clicking on a node
+    e.preventDefault();
+    // Prevent SVG pan-zoom from interfering when starting a node drag
     e.stopPropagation();
-    
+
     const svg = mermaidOutput.querySelector('svg');
     if (!svg) return;
     

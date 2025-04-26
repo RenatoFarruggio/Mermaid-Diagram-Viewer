@@ -5,13 +5,11 @@ Please create a website (html, css, js) and whatever you deem necessary to creat
 - Have some sort of display to render the graph.
 - The user should be able to drag around in the display with the right mouse click and dragging it.
 - The user should be able to zoom in and out in the display by scrolling the mouse wheel.
-- The user should be able to freely drag around the nodes by clicking on them with the left mouse button and dragging them around. The arrows and other edges should adapt accordingly, sticking to the nodes.
+- The user should be able to freely drag around the nodes by clicking on them with the right mouse button and dragging them around. The arrows and other edges should adapt accordingly, sticking to the nodes.
 - It should have a easily toggleable dark mode.
 - The default text in the textbox should be:
 """
 classDiagram
-    Animal <|-- Dog
-    Animal <|-- Cat
     class Animal {
         +String species
         +makeSound()
@@ -22,4 +20,6 @@ classDiagram
     class Cat {
         +meow()
     }
+Animal --o Dog : has
+Animal <|-- Cat : is
 """
