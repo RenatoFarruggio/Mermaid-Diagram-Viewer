@@ -90,10 +90,12 @@ body.dark-mode .key {
     background-color: #fff;
     border-radius: 4px;
     min-height: 800px;
+    width: 100%;
+    box-sizing: border-box;
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow: hidden;
+    overflow: visible;
     position: relative;
 }
 
@@ -104,9 +106,18 @@ body.dark-mode #mermaidOutput {
 
 /* Make sure SVG takes up full space */
 #mermaidOutput svg {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 100%;
+    min-height: 800px;
+    cursor: default;
+}
+
+/* Ensure the SVG viewport can extend beyond container */
+#mermaidOutput svg > g {
+    transform-origin: center;
     width: 100%;
     height: 100%;
-    cursor: default;
 }
 
 /* Set cursor for draggable nodes */

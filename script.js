@@ -61,14 +61,20 @@ const initializePanZoom = () => {
         panZoomInstance.destroy();
     }
     
+    // Ensure SVG has proper viewBox
+    if (!svg.getAttribute('viewBox')) {
+        const bbox = svg.getBBox();
+        svg.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
+    }
+    
     // Create new instance
     panZoomInstance = svgPanZoom(svg, {
         zoomEnabled: true,
         controlIconsEnabled: false,
         fit: true,
         center: true,
-        minZoom: 0.2,
-        maxZoom: 5,
+        minZoom: 0.1,
+        maxZoom: 10,
         zoomScaleSensitivity: 0.3,
         mouseWheelZoomEnabled: true,
         dblClickZoomEnabled: false,
