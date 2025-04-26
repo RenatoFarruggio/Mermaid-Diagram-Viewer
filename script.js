@@ -123,7 +123,7 @@ const makeNodesDraggable = () => {
 function analyzeEdges(svg) {
     edgeConnections.clear(); // Ensure we start fresh
     console.log("--- Analyzing Edges --- Firing analyseEdges ---");
-    
+
     // Get nodes first
     const nodes = svg.querySelectorAll('g.node');
     const nodeMap = new Map();
@@ -133,68 +133,94 @@ function analyzeEdges(svg) {
         if (nodeId) {
             console.log(`  Node ${index}: Found ID: ${nodeId}`);
             nodeMap.set(nodeId, node);
+        } else {
+            console.warn(`  Node ${index}: Missing ID.`);
         }
     });
     console.log(`Mapped ${nodeMap.size} nodes based on their IDs.`);
 
     // Get edge paths - they're direct children of g.edgePaths
     const edgePathsGroup = svg.querySelector('g.edgePaths');
-    if (!edgePathsGroup) {
-        console.warn("No edgePaths group found in SVG");
-        return;
-    }
-
-    const edges = edgePathsGroup.querySelectorAll('path');
+    const edges = edgePathsGroup ? Array.from(edgePathsGroup.querySelectorAll('path')) : []; // Get as array
     console.log(`Found ${edges.length} edge paths`);
 
+    // Get edge labels - they're direct children of g.edgeLabels
+    const edgeLabelsGroup = svg.querySelector('g.edgeLabels');
+    const labels = edgeLabelsGroup ? Array.from(edgeLabelsGroup.querySelectorAll('g.edgeLabel')) : []; // Get as array
+    console.log(`Found ${labels.length} edge labels`);
+
+    // Basic sanity check for order-based matching
+    if (edges.length !== labels.length && labels.length > 0) {
+        console.warn(`WARN: Mismatch between edge path count (${edges.length}) and edge label count (${labels.length}). Label association by order might be incorrect.`);
+        // We'll still try, but it might fail for some edges
+    }
+
     edges.forEach((edge, index) => {
-        const edgeId = edge.id;
-        console.log(`Analyzing Edge ${index}: ID='${edgeId}'`);
+        // Use index as a fallback if ID is missing, important for map key
+        const edgeId = edge.id || `edge-index-${index}`;
+        console.log(`Analyzing Edge ${index}: ID='${edge.id || '(no id)'}' (Using map key: ${edgeId})`);
 
-        // Extract source and target from the ID (format: id_Animal_Dog_1)
-        const idParts = edgeId.split('_');
+        // Extract source and target from the ID if possible (format: id_Animal_Dog_1)
+        const idParts = edge.id ? edge.id.split('_') : [];
+        let sourceName = `unknownSource-${index}`;
+        let targetName = `unknownTarget-${index}`;
+
         if (idParts.length >= 3) {
-            const sourceName = idParts[1]; // e.g., "Animal"
-            const targetName = idParts[2]; // e.g., "Dog"
-
-            // Find the corresponding node IDs
-            const sourceNodeId = Array.from(nodeMap.keys()).find(id => id.includes(sourceName));
-            const targetNodeId = Array.from(nodeMap.keys()).find(id => id.includes(targetName));
-
+            sourceName = idParts[1]; // e.g., "Animal"
+            targetName = idParts[2]; // e.g., "Dog"
             console.log(`  Extracted from ID: ${sourceName} -> ${targetName}`);
-            console.log(`  Found node IDs: ${sourceNodeId} -> ${targetNodeId}`);
-            
-            if (sourceNodeId && targetNodeId) {
-                const sourceNode = nodeMap.get(sourceNodeId);
-                const targetNode = nodeMap.get(targetNodeId);
-                
-                if (sourceNode && targetNode) {
-                    console.log(`  SUCCESS: Linked edge ${edgeId} from ${sourceNodeId} to ${targetNodeId}`);
-                    
-                    // Store the original path data for later use
-                    const originalD = edge.getAttribute('d');
-                    const markerEnd = edge.getAttribute('marker-end');
-                    const markerStart = edge.getAttribute('marker-start');
-                    
-                    edgeConnections.set(edgeId, {
-                        edge: edge,
-                        source: sourceNode,
-                        target: targetNode,
-                        originalD: originalD,
-                        markerEnd: markerEnd,
-                        markerStart: markerStart,
-                        // Initial positions for reference
-                        initialSourcePos: getNodeCenterPosition(sourceNode),
-                        initialTargetPos: getNodeCenterPosition(targetNode)
-                    });
-                } else {
-                    console.warn(`  WARN: Found source/target IDs (${sourceNodeId}, ${targetNodeId}) for edge ${edgeId}, but couldn't find matching nodes.`);
-                }
+        } else {
+            console.warn(`  WARN: Could not extract source/target names from edge ID '${edge.id}'. Node lookup might fail.`);
+        }
+
+        // Find the corresponding node IDs - This part needs the names
+        // If names couldn't be extracted, node lookup will likely fail here
+        const sourceNodeId = Array.from(nodeMap.keys()).find(id => id && id.includes(sourceName));
+        const targetNodeId = Array.from(nodeMap.keys()).find(id => id && id.includes(targetName));
+        console.log(`  Attempting node lookup for: ${sourceName} -> ${targetName}`);
+        console.log(`  Found node IDs: ${sourceNodeId || 'Not Found'} -> ${targetNodeId || 'Not Found'}`);
+
+        // --- Associate label based on index ---
+        let correspondingLabel = null;
+        if (index < labels.length) {
+            correspondingLabel = labels[index];
+            const labelId = correspondingLabel.id || `label-index-${index}`; // Use index if ID missing
+            console.log(`  Associated label index ${index} (ID: '${correspondingLabel.id || '(no id)'}')`);
+        } else {
+            console.warn(`  WARN: No corresponding label found at index ${index} for edge ${edgeId}`);
+        }
+        // --- End label association ---
+
+
+        if (sourceNodeId && targetNodeId) {
+            const sourceNode = nodeMap.get(sourceNodeId);
+            const targetNode = nodeMap.get(targetNodeId);
+
+            if (sourceNode && targetNode) {
+                console.log(`  SUCCESS: Linked edge ${edgeId} from ${sourceNodeId} to ${targetNodeId}`);
+
+                const originalD = edge.getAttribute('d');
+                const markerEnd = edge.getAttribute('marker-end');
+                const markerStart = edge.getAttribute('marker-start');
+
+                edgeConnections.set(edgeId, { // Use the potentially generated edgeId as key
+                    edge: edge,
+                    source: sourceNode,
+                    target: targetNode,
+                    label: correspondingLabel, // Store the label found by index
+                    originalD: originalD,
+                    markerEnd: markerEnd,
+                    markerStart: markerStart,
+                    initialSourcePos: getNodeCenterPosition(sourceNode),
+                    initialTargetPos: getNodeCenterPosition(targetNode)
+                });
             } else {
-                console.warn(`  WARN: Could not find matching node IDs for edge ${edgeId}`);
+                 console.warn(`  WARN: Found node IDs (${sourceNodeId}, ${targetNodeId}) but couldn't retrieve nodes from map.`);
             }
         } else {
-            console.warn(`  WARN: Edge ID ${edgeId} does not match expected format`);
+            console.warn(`  WARN: Could not find matching node IDs for edge ${edgeId} (Names: ${sourceName}, ${targetName})`);
+            // Still store edge info even if nodes aren't found? Maybe not useful without nodes.
+            // Let's only store if nodes are found.
         }
     });
 
@@ -530,7 +556,7 @@ function getTransformedBoundaryPoints(rect, transform) {
 
 // Update edge position based on node positions using transforms
 function updateEdgePosition(connection) {
-    const { edge, source, target, originalD, initialSourcePos, initialTargetPos, markerStart, markerEnd } = connection;
+    const { edge, source, target, originalD, initialSourcePos, initialTargetPos, markerStart, markerEnd, label } = connection;
     
     if (!edge || !source || !target || !originalD) {
         console.error("updateEdgePosition: Missing required connection data.");
@@ -601,6 +627,36 @@ function updateEdgePosition(connection) {
     const newPath = `M${pathStart.x},${pathStart.y} L${pathEnd.x},${pathEnd.y}`;
     edge.setAttribute('d', newPath);
     console.log(`    Set edge path to: ${newPath}`);
+
+    // --- Update Label Position ---
+    if (label) {
+        // Calculate the midpoint of the *adjusted* edge segment
+        const midX = (pathStart.x + pathEnd.x) / 2;
+        const midY = (pathStart.y + pathEnd.y) / 2;
+
+        // Get the label's bounding box to help center it
+        // Note: getBBox() might not work perfectly if the label itself has transforms.
+        // If labels are complex, this might need adjustment.
+        let labelBBox = { width: 0, height: 0 };
+        try {
+             // Need to handle potential errors if the element isn't rendered correctly yet
+             labelBBox = label.getBBox();
+        } catch (e) {
+            console.warn(`Could not get BBox for label ${label.id}: ${e.message}`);
+            // Use a default small size or skip positioning if BBox fails
+            labelBBox = { width: 10, height: 5 }; // Fallback estimate
+        }
+
+        // Apply translate transform to the label group
+        // Center the label based on its bounding box
+        const labelX = midX - labelBBox.width / 2;
+        const labelY = midY; // Place vertically centered on the line
+
+        label.setAttribute('transform', `translate(${labelX}, ${labelY})`);
+        console.log(`    Set label ${label.id} transform to: translate(${labelX}, ${labelY})`);
+    } else {
+        // console.log(`    No label found for edge ${edge.id} to update.`);
+    }
 }
 
 // Function to render the Mermaid diagram
