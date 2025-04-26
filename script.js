@@ -170,11 +170,22 @@ function analyzeEdges(svg) {
 
                 if (sourceNode && targetNode) {
                     console.log(`  SUCCESS: Linked edge ${edgeId} from ${sourceNodeId} to ${targetNodeId}`);
+                    
+                    // Store the original path data for later use
+                    const originalD = edge.getAttribute('d');
+                    const markerEnd = edge.getAttribute('marker-end');
+                    const markerStart = edge.getAttribute('marker-start');
+                    
                     edgeConnections.set(edgeId, {
                         edge: edge,
                         source: sourceNode,
                         target: targetNode,
-                        paths: [edge] // The path itself is the main path
+                        originalD: originalD,
+                        markerEnd: markerEnd,
+                        markerStart: markerStart,
+                        // Initial positions for reference
+                        initialSourcePos: getNodeCenterPosition(sourceNode),
+                        initialTargetPos: getNodeCenterPosition(targetNode)
                     });
                 } else {
                     console.warn(`  WARN: Found source/target IDs (${sourceNodeId}, ${targetNodeId}) for edge ${edgeId}, but couldn't find matching nodes.`);
@@ -188,6 +199,17 @@ function analyzeEdges(svg) {
     });
 
     console.log(`--- Edge analysis complete. ${edgeConnections.size} connections stored. ---`);
+}
+
+// Helper to get the center position of a node
+function getNodeCenterPosition(node) {
+    const bbox = node.getBBox();
+    const transform = getNodeTransform(node);
+    
+    return {
+        x: bbox.x + bbox.width / 2 + transform.x,
+        y: bbox.y + bbox.height / 2 + transform.y
+    };
 }
 
 // Node dragging handlers
@@ -314,89 +336,59 @@ function getTransformedBoundaryPoints(rect, transform) {
     };
 }
 
-// Update edge position based on node positions using boundary points
+// Update edge position based on node positions using transforms
 function updateEdgePosition(connection) {
-    const { edge, source, target, paths } = connection;
-    if (!edge || !source || !target || !paths || paths.length === 0) {
-        console.error("updateEdgePosition: Missing required connection data.", connection);
+    const { edge, source, target, originalD, initialSourcePos, initialTargetPos } = connection;
+    
+    if (!edge || !source || !target || !originalD) {
+        console.error("updateEdgePosition: Missing required connection data.");
         return;
     }
 
     console.log(`  Updating position for edge between ${source.id} and ${target.id}`);
 
-    // Get transforms
-    const sourceTransform = getNodeTransform(source);
-    const targetTransform = getNodeTransform(target);
-    console.log(`    Source Transform:`, sourceTransform);
-    console.log(`    Target Transform:`, targetTransform);
+    // Get current positions of nodes
+    const currentSourcePos = getNodeCenterPosition(source);
+    const currentTargetPos = getNodeCenterPosition(target);
+    
+    console.log(`    Initial source position:`, initialSourcePos);
+    console.log(`    Current source position:`, currentSourcePos);
+    console.log(`    Initial target position:`, initialTargetPos);
+    console.log(`    Current target position:`, currentTargetPos);
 
-    // Get *untransformed* bounding boxes
-    const sourceRect = source.getBBox();
-    const targetRect = target.getBBox();
-    console.log(`    Source BBox:`, sourceRect);
-    console.log(`    Target BBox:`, targetRect);
+    // Calculate the translation needed for both ends
+    const sourceDx = currentSourcePos.x - initialSourcePos.x;
+    const sourceDy = currentSourcePos.y - initialSourcePos.y;
+    const targetDx = currentTargetPos.x - initialTargetPos.x;
+    const targetDy = currentTargetPos.y - initialTargetPos.y;
 
-    // Calculate potential connection points on boundaries
-    const sourcePoints = getTransformedBoundaryPoints(sourceRect, sourceTransform);
-    const targetPoints = getTransformedBoundaryPoints(targetRect, targetTransform);
-
-    // Find the pair of boundary points (one on source, one on target)
-    // that are closest to each other.
-    let minDistSq = Infinity;
-    let closestSourcePoint = sourcePoints.center;
-    let closestTargetPoint = targetPoints.center;
-
-    for (const sp of sourcePoints.boundaries) {
-        for (const tp of targetPoints.boundaries) {
-            const dx = sp.x - tp.x;
-            const dy = sp.y - tp.y;
-            const distSq = dx * dx + dy * dy;
-            if (distSq < minDistSq) {
-                minDistSq = distSq;
-                closestSourcePoint = sp;
-                closestTargetPoint = tp;
-            }
-        }
-    }
-    console.log(`    Closest Points: Source=`, closestSourcePoint, `Target=`, closestTargetPoint);
-
-    // Update the main path (assuming it's the first path element for now)
-    // More robust: Identify path by lack of marker attribute?
-    const mainPath = paths.find(p => !p.hasAttribute('marker-end') && !p.hasAttribute('marker-start')) || paths[0];
-    if (!mainPath) {
-        console.error("  Could not find main path element for edge.");
+    // If neither node has moved, nothing to do
+    if (Math.abs(sourceDx) < 0.1 && Math.abs(sourceDy) < 0.1 && Math.abs(targetDx) < 0.1 && Math.abs(targetDy) < 0.1) {
         return;
     }
-    const dAttr = `M${closestSourcePoint.x},${closestSourcePoint.y} L${closestTargetPoint.x},${closestTargetPoint.y}`;
-    mainPath.setAttribute('d', dAttr);
-    console.log(`    Set main path 'd': ${dAttr}`);
 
-    // Update markers (arrowheads, etc.)
-    const markerPath = paths.find(p => p.hasAttribute('marker-end') || p.hasAttribute('marker-start'));
-    if (markerPath) {
-        const dx = closestTargetPoint.x - closestSourcePoint.x;
-        const dy = closestTargetPoint.y - closestSourcePoint.y;
-        const angle = (dx === 0 && dy === 0) ? 0 : Math.atan2(dy, dx) * (180 / Math.PI);
+    // Update the edge's path
+    // This approach creates a new path that goes from current source to current target position
+    // We'll simplify to a direct line for now
+    const newPath = `M${currentSourcePos.x},${currentSourcePos.y} L${currentTargetPos.x},${currentTargetPos.y}`;
+    edge.setAttribute('d', newPath);
+    console.log(`    Set edge path to: ${newPath}`);
 
-        // Determine which end the marker is on
-        let targetPointForMarker = closestTargetPoint; // Assume marker-end
-        if (markerPath.hasAttribute('marker-start')) {
-            targetPointForMarker = closestSourcePoint;
-             // Adjust angle if marker is at the start (points away from target)
-             // angle += 180; // Rotation handles directionality, but position is key
-        }
-
-        const markerTransform = `translate(${targetPointForMarker.x}, ${targetPointForMarker.y}) rotate(${angle})`;
-        markerPath.setAttribute('transform', markerTransform);
-        console.log(`    Set marker path transform: ${markerTransform}`);
-
-    } else {
-        console.log("    No marker path found for this edge.");
-        // Check if there are other paths that aren't the main one
-        const otherPaths = paths.filter(p => p !== mainPath);
-        if(otherPaths.length > 0) {
-            console.log(`    Note: Found ${otherPaths.length} other path(s) associated with the edge that were not identified as main or marker.`);
-        }
+    // Handle markers (arrowheads)
+    const dx = currentTargetPos.x - currentSourcePos.x;
+    const dy = currentTargetPos.y - currentSourcePos.y;
+    const angle = (dx === 0 && dy === 0) ? 0 : Math.atan2(dy, dx) * (180 / Math.PI);
+    
+    // If we have a marker-end, update the marker element
+    if (connection.markerEnd) {
+        // Mermaid uses defs and markers defined in the SVG
+        // We can leave these as is, they should still work with our new path
+        console.log(`    Edge has marker-end: ${connection.markerEnd}`);
+    }
+    
+    // If we have a marker-start, update the marker element
+    if (connection.markerStart) {
+        console.log(`    Edge has marker-start: ${connection.markerStart}`);
     }
 }
 
