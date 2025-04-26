@@ -57,11 +57,23 @@ function initializePanZoom() {
         panZoomInstance.destroy();
     }
     
-    // Ensure SVG has proper viewBox
-    if (!svg.getAttribute('viewBox')) {
-        const bbox = svg.getBBox();
-        svg.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
-    }
+    // Get the SVG dimensions and parent container dimensions
+    const svgBBox = svg.getBBox();
+    const containerWidth = mermaidOutput.clientWidth;
+    const containerHeight = mermaidOutput.clientHeight;
+    
+    // Calculate center point of the diagram
+    const centerX = svgBBox.x + svgBBox.width / 2;
+    const centerY = svgBBox.y + svgBBox.height / 2;
+    
+    // Set an explicit viewBox centered on the diagram
+    const viewBoxWidth = Math.max(svgBBox.width * 1.1, containerWidth);
+    const viewBoxHeight = Math.max(svgBBox.height * 1.1, containerHeight);
+    const viewBoxX = centerX - viewBoxWidth / 2;
+    const viewBoxY = centerY - viewBoxHeight / 2;
+    
+    // Apply the centered viewBox
+    svg.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
 
     // Panning state - needs to be accessible by the listener
     let isPanning = false;
@@ -111,6 +123,14 @@ function initializePanZoom() {
         dblClickZoomEnabled: false,
         beforePan: () => isPanning // Control panning based on our flag
     });
+    
+    // Force center and fit once the pan-zoom is initialized
+    setTimeout(() => {
+        if (panZoomInstance) {
+            panZoomInstance.center();
+            panZoomInstance.fit();
+        }
+    }, 100);
     
     // Prevent the default context menu on the SVG element for all right-clicks
     svg.addEventListener('contextmenu', e => {
