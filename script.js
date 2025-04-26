@@ -163,11 +163,11 @@ function analyzeEdges(svg) {
 
             console.log(`  Extracted from ID: ${sourceName} -> ${targetName}`);
             console.log(`  Found node IDs: ${sourceNodeId} -> ${targetNodeId}`);
-
+            
             if (sourceNodeId && targetNodeId) {
                 const sourceNode = nodeMap.get(sourceNodeId);
                 const targetNode = nodeMap.get(targetNodeId);
-
+                
                 if (sourceNode && targetNode) {
                     console.log(`  SUCCESS: Linked edge ${edgeId} from ${sourceNodeId} to ${targetNodeId}`);
                     
@@ -210,6 +210,198 @@ function getNodeCenterPosition(node) {
         x: bbox.x + bbox.width / 2 + transform.x,
         y: bbox.y + bbox.height / 2 + transform.y
     };
+}
+
+// Helper to get the rectangle for a node (with transform applied)
+function getNodeRect(node) {
+    const bbox = node.getBBox();
+    const transform = getNodeTransform(node);
+    
+    return {
+        x: bbox.x + transform.x,
+        y: bbox.y + transform.y,
+        width: bbox.width,
+        height: bbox.height,
+        centerX: bbox.x + bbox.width / 2 + transform.x,
+        centerY: bbox.y + bbox.height / 2 + transform.y,
+        left: bbox.x + transform.x,
+        right: bbox.x + bbox.width + transform.x,
+        top: bbox.y + transform.y,
+        bottom: bbox.y + bbox.height + transform.y
+    };
+}
+
+// Find intersection of a line with a rectangle 
+function findIntersection(rect, fromX, fromY, toX, toY) {
+    console.log(`Finding intersection: From (${fromX}, ${fromY}) to (${toX}, ${toY}) with rect (${rect.left}, ${rect.top}, ${rect.right}, ${rect.bottom})`);
+    
+    // Calculate direction vector
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    
+    // For points inside the rectangle, we still want to find the border intersection
+    // in the direction of the target point
+    if (fromX >= rect.left && fromX <= rect.right && 
+        fromY >= rect.top && fromY <= rect.bottom) {
+        console.log("  Source point is inside rectangle, finding border intersection");
+        
+        // Initialize for closest intersection
+        let minDist = Infinity;
+        let closestPoint = null;
+        
+        // Check each edge for intersection with the ray extending from inside to outside
+        
+        // Left edge: x = rect.left
+        if (dx < 0) { // Only check if ray is going left
+            const t = (rect.left - fromX) / dx;
+            const y = fromY + t * dy;
+            if (y >= rect.top && y <= rect.bottom) {
+                const dist = t * Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = { x: rect.left, y: y };
+                }
+            }
+        }
+        
+        // Right edge: x = rect.right
+        if (dx > 0) { // Only check if ray is going right
+            const t = (rect.right - fromX) / dx;
+            const y = fromY + t * dy;
+            if (y >= rect.top && y <= rect.bottom) {
+                const dist = t * Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = { x: rect.right, y: y };
+                }
+            }
+        }
+        
+        // Top edge: y = rect.top
+        if (dy < 0) { // Only check if ray is going up
+            const t = (rect.top - fromY) / dy;
+            const x = fromX + t * dx;
+            if (x >= rect.left && x <= rect.right) {
+                const dist = t * Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = { x: x, y: rect.top };
+                }
+            }
+        }
+        
+        // Bottom edge: y = rect.bottom
+        if (dy > 0) { // Only check if ray is going down
+            const t = (rect.bottom - fromY) / dy;
+            const x = fromX + t * dx;
+            if (x >= rect.left && x <= rect.right) {
+                const dist = t * Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = { x: x, y: rect.bottom };
+                }
+            }
+        }
+        
+        if (closestPoint) {
+            console.log(`  Found border intersection at (${closestPoint.x}, ${closestPoint.y})`);
+            return closestPoint;
+        }
+    }
+    
+    // For points outside the rectangle, find the closest intersection with any edge
+    // Temporary variables for intersection
+    let minDist = Infinity;
+    let closestPoint = null;
+    
+    // Check intersection with left edge
+    if (dx !== 0) {
+        const t = (rect.left - fromX) / dx;
+        if (t >= 0 && t <= 1) {
+            const y = fromY + t * dy;
+            if (y >= rect.top && y <= rect.bottom) {
+                const dist = t * Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = { x: rect.left, y: y };
+                    console.log(`  Found intersection with left edge at (${rect.left}, ${y}), dist=${dist}`);
+                }
+            }
+        }
+    }
+    
+    // Check intersection with right edge
+    if (dx !== 0) {
+        const t = (rect.right - fromX) / dx;
+        if (t >= 0 && t <= 1) {
+            const y = fromY + t * dy;
+            if (y >= rect.top && y <= rect.bottom) {
+                const dist = t * Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = { x: rect.right, y: y };
+                    console.log(`  Found intersection with right edge at (${rect.right}, ${y}), dist=${dist}`);
+                }
+            }
+        }
+    }
+    
+    // Check intersection with top edge
+    if (dy !== 0) {
+        const t = (rect.top - fromY) / dy;
+        if (t >= 0 && t <= 1) {
+            const x = fromX + t * dx;
+            if (x >= rect.left && x <= rect.right) {
+                const dist = t * Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = { x: x, y: rect.top };
+                    console.log(`  Found intersection with top edge at (${x}, ${rect.top}), dist=${dist}`);
+                }
+            }
+        }
+    }
+    
+    // Check intersection with bottom edge
+    if (dy !== 0) {
+        const t = (rect.bottom - fromY) / dy;
+        if (t >= 0 && t <= 1) {
+            const x = fromX + t * dx;
+            if (x >= rect.left && x <= rect.right) {
+                const dist = t * Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = { x: x, y: rect.bottom };
+                    console.log(`  Found intersection with bottom edge at (${x}, ${rect.bottom}), dist=${dist}`);
+                }
+            }
+        }
+    }
+    
+    if (closestPoint) {
+        console.log(`  Closest intersection point: (${closestPoint.x}, ${closestPoint.y}), dist=${minDist}`);
+        return closestPoint;
+    } else {
+        console.log("  No intersection found with rectangle");
+        // If no intersection is found, use the center of the closest edge
+        const leftDist = Math.abs(rect.left - fromX);
+        const rightDist = Math.abs(rect.right - fromX);
+        const topDist = Math.abs(rect.top - fromY);
+        const bottomDist = Math.abs(rect.bottom - fromY);
+        
+        // Find closest edge
+        const minEdgeDist = Math.min(leftDist, rightDist, topDist, bottomDist);
+        
+        if (minEdgeDist === leftDist) {
+            return { x: rect.left, y: Math.max(rect.top, Math.min(rect.bottom, fromY)) };
+        } else if (minEdgeDist === rightDist) {
+            return { x: rect.right, y: Math.max(rect.top, Math.min(rect.bottom, fromY)) };
+        } else if (minEdgeDist === topDist) {
+            return { x: Math.max(rect.left, Math.min(rect.right, fromX)), y: rect.top };
+        } else {
+            return { x: Math.max(rect.left, Math.min(rect.right, fromX)), y: rect.bottom };
+        }
+    }
 }
 
 // Node dragging handlers
@@ -291,7 +483,7 @@ function handleNodeMouseUp() {
 function updateConnectedEdges(node) {
     if (!node || !node.id) return;
     console.log(`Updating edges connected to node: ${node.id}`);
-
+    
     // Find all edges connected to this node
     edgeConnections.forEach((connection, edgeId) => {
         if (connection.source === node || connection.target === node) {
@@ -338,7 +530,7 @@ function getTransformedBoundaryPoints(rect, transform) {
 
 // Update edge position based on node positions using transforms
 function updateEdgePosition(connection) {
-    const { edge, source, target, originalD, initialSourcePos, initialTargetPos } = connection;
+    const { edge, source, target, originalD, initialSourcePos, initialTargetPos, markerStart, markerEnd } = connection;
     
     if (!edge || !source || !target || !originalD) {
         console.error("updateEdgePosition: Missing required connection data.");
@@ -346,50 +538,69 @@ function updateEdgePosition(connection) {
     }
 
     console.log(`  Updating position for edge between ${source.id} and ${target.id}`);
+    console.log(`  Edge has markerStart: ${markerStart || 'none'}, markerEnd: ${markerEnd || 'none'}`);
 
-    // Get current positions of nodes
-    const currentSourcePos = getNodeCenterPosition(source);
-    const currentTargetPos = getNodeCenterPosition(target);
+    // Get current source and target positions
+    const sourceCenter = getNodeCenterPosition(source);
+    const targetCenter = getNodeCenterPosition(target);
     
-    console.log(`    Initial source position:`, initialSourcePos);
-    console.log(`    Current source position:`, currentSourcePos);
-    console.log(`    Initial target position:`, initialTargetPos);
-    console.log(`    Current target position:`, currentTargetPos);
-
-    // Calculate the translation needed for both ends
-    const sourceDx = currentSourcePos.x - initialSourcePos.x;
-    const sourceDy = currentSourcePos.y - initialSourcePos.y;
-    const targetDx = currentTargetPos.x - initialTargetPos.x;
-    const targetDy = currentTargetPos.y - initialTargetPos.y;
-
-    // If neither node has moved, nothing to do
-    if (Math.abs(sourceDx) < 0.1 && Math.abs(sourceDy) < 0.1 && Math.abs(targetDx) < 0.1 && Math.abs(targetDy) < 0.1) {
-        return;
+    // Get current node rectangles with transforms applied
+    const sourceRect = getNodeRect(source);
+    const targetRect = getNodeRect(target);
+    
+    console.log("Source rect:", sourceRect);
+    console.log("Target rect:", targetRect);
+    
+    // Find intersection points with rectangle edges
+    const sourceIntersection = findIntersection(sourceRect, sourceCenter.x, sourceCenter.y, targetCenter.x, targetCenter.y);
+    const targetIntersection = findIntersection(targetRect, targetCenter.x, targetCenter.y, sourceCenter.x, sourceCenter.y);
+    
+    // If we couldn't find intersections, use the centers
+    let pathStart = sourceIntersection || sourceCenter;
+    let pathEnd = targetIntersection || targetCenter;
+    
+    console.log("Original source intersection:", pathStart);
+    console.log("Original target intersection:", pathEnd);
+    
+    // Determine which end needs extra offset for arrow visibility
+    const hasStartArrow = markerStart && markerStart.length > 0;
+    const hasEndArrow = markerEnd && markerEnd.length > 0;
+    
+    // Calculate direction vector
+    const dx = pathEnd.x - pathStart.x;
+    const dy = pathEnd.y - pathStart.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    
+    // Only add offset if the points aren't too close together
+    if (length > 10) {
+        // Unit vector in the direction of the line
+        const unitX = dx / length;
+        const unitY = dy / length;
+        
+        // Use different offsets for start and end
+        const regularOffset = 5;     // Regular offset (non-arrow end)
+        const arrowTipOffset = 20;   // Arrow tip needs more space to be fully visible
+        
+        // Apply offset to start point - bigger offset if there's a start arrow
+        pathStart = {
+            x: pathStart.x + unitX * (hasStartArrow ? arrowTipOffset : regularOffset),
+            y: pathStart.y + unitY * (hasStartArrow ? arrowTipOffset : regularOffset)
+        };
+        
+        // Apply offset to end point - bigger offset if there's an end arrow
+        pathEnd = {
+            x: pathEnd.x - unitX * (hasEndArrow ? arrowTipOffset : regularOffset),
+            y: pathEnd.y - unitY * (hasEndArrow ? arrowTipOffset : regularOffset)
+        };
+        
+        console.log("Adjusted path start:", pathStart);
+        console.log("Adjusted path end:", pathEnd);
     }
-
-    // Update the edge's path
-    // This approach creates a new path that goes from current source to current target position
-    // We'll simplify to a direct line for now
-    const newPath = `M${currentSourcePos.x},${currentSourcePos.y} L${currentTargetPos.x},${currentTargetPos.y}`;
+    
+    // Update the edge's path (always from source to target)
+    const newPath = `M${pathStart.x},${pathStart.y} L${pathEnd.x},${pathEnd.y}`;
     edge.setAttribute('d', newPath);
     console.log(`    Set edge path to: ${newPath}`);
-
-    // Handle markers (arrowheads)
-    const dx = currentTargetPos.x - currentSourcePos.x;
-    const dy = currentTargetPos.y - currentSourcePos.y;
-    const angle = (dx === 0 && dy === 0) ? 0 : Math.atan2(dy, dx) * (180 / Math.PI);
-    
-    // If we have a marker-end, update the marker element
-    if (connection.markerEnd) {
-        // Mermaid uses defs and markers defined in the SVG
-        // We can leave these as is, they should still work with our new path
-        console.log(`    Edge has marker-end: ${connection.markerEnd}`);
-    }
-    
-    // If we have a marker-start, update the marker element
-    if (connection.markerStart) {
-        console.log(`    Edge has marker-start: ${connection.markerStart}`);
-    }
 }
 
 // Function to render the Mermaid diagram
