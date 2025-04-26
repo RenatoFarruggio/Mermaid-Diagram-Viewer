@@ -48,7 +48,7 @@ const cleanup = () => {
 };
 
 // Initialize SVG pan-zoom for panning and zooming
-const initializePanZoom = () => {
+function initializePanZoom() {
     const svg = mermaidOutput.querySelector('svg');
     if (!svg) return;
     
@@ -67,28 +67,35 @@ const initializePanZoom = () => {
     let isPanning = false;
 
     svg.addEventListener('mousedown', (e) => {
-        // Check if right button AND the click is NOT on a node or its children
-        if (e.button === 2 && !e.target.closest('g.node')) {
-             isPanning = true;
-             // Optional: Add class for cursor styling if needed
-             // svg.classList.add('panning-active');
+        // Handle RIGHT clicks only for panning or node dragging
+        if (e.button === 2) {
+            const targetNode = e.target.closest('g.node');
+            if (targetNode) {
+                // Right-clicked on a node, initiate drag
+                isPanning = false; // Ensure panning is disabled
+                handleNodeMouseDown(e, targetNode); // Manually call handler
+            } else {
+                // Right-clicked on background, allow panning
+                isPanning = true;
+            }
         } else {
-            isPanning = false; // Ensure panning is off if conditions not met
+            // Other clicks (left/middle) should not interfere
+            isPanning = false;
         }
     });
+    
     svg.addEventListener('mouseup', () => {
         if (isPanning) {
             isPanning = false;
-            // Optional: Remove class on mouse up
-            // svg.classList.remove('panning-active');
         }
+        // Note: Node drag mouseup is handled by the document listener
     });
+    
     svg.addEventListener('mouseleave', () => {
          if (isPanning) {
              isPanning = false;
-            // Optional: Remove class on mouse leave
-            // svg.classList.remove('panning-active');
          }
+         // Note: Node drag mouseup is handled by the document listener
     });
 
     // Create new instance, using the isPanning flag in beforePan
@@ -102,7 +109,6 @@ const initializePanZoom = () => {
         zoomScaleSensitivity: 0.3,
         mouseWheelZoomEnabled: true,
         dblClickZoomEnabled: false,
-        eventsListenerElement: svg.parentNode, // Use parent for events
         beforePan: () => isPanning // Control panning based on our flag
     });
     
@@ -111,7 +117,7 @@ const initializePanZoom = () => {
         e.preventDefault();
         return false;
     });
-};
+}
 
 // Make nodes draggable
 const makeNodesDraggable = () => {
@@ -121,11 +127,11 @@ const makeNodesDraggable = () => {
     // Find and analyze all edges
     analyzeEdges(svg);
     
-    // Make nodes draggable
+    // Nodes are handled by the central SVG listener now.
+    // Just ensure shapes within nodes are clickable.
     const nodes = svg.querySelectorAll('g.node');
-    
     nodes.forEach(node => {
-        node.addEventListener('mousedown', handleNodeMouseDown);
+        // node.addEventListener('mousedown', handleNodeMouseDown); // REMOVED THIS
         
         // Make sure the whole node is clickable
         const shapes = node.querySelectorAll('rect, circle, ellipse, polygon');
@@ -134,7 +140,7 @@ const makeNodesDraggable = () => {
         });
     });
     
-    // Add document-level event listeners
+    // Add document-level event listeners for move/up during drag
     document.addEventListener('mousemove', handleNodeMouseMove);
     document.addEventListener('mouseup', handleNodeMouseUp);
 };
@@ -142,32 +148,32 @@ const makeNodesDraggable = () => {
 // Analyze edges and store connection info
 function analyzeEdges(svg) {
     edgeConnections.clear(); // Ensure we start fresh
-    console.log("--- Analyzing Edges --- Firing analyseEdges ---");
+    // console.log("--- Analyzing Edges --- Firing analyseEdges ---");
 
     // Get nodes first
     const nodes = svg.querySelectorAll('g.node');
     const nodeMap = new Map();
-    console.log(`Found ${nodes.length} potential node elements (g.node)`);
+    // console.log(`Found ${nodes.length} potential node elements (g.node)`);
     nodes.forEach((node, index) => {
         const nodeId = node.id;
         if (nodeId) {
-            console.log(`  Node ${index}: Found ID: ${nodeId}`);
+            // console.log(`  Node ${index}: Found ID: ${nodeId}`);
             nodeMap.set(nodeId, node);
         } else {
-            console.warn(`  Node ${index}: Missing ID.`);
+            // console.warn(`  Node ${index}: Missing ID.`);
         }
     });
-    console.log(`Mapped ${nodeMap.size} nodes based on their IDs.`);
+    // console.log(`Mapped ${nodeMap.size} nodes based on their IDs.`);
 
     // Get edge paths - they're direct children of g.edgePaths
     const edgePathsGroup = svg.querySelector('g.edgePaths');
     const edges = edgePathsGroup ? Array.from(edgePathsGroup.querySelectorAll('path')) : []; // Get as array
-    console.log(`Found ${edges.length} edge paths`);
+    // console.log(`Found ${edges.length} edge paths`);
 
     // Get edge labels - they're direct children of g.edgeLabels
     const edgeLabelsGroup = svg.querySelector('g.edgeLabels');
     const labels = edgeLabelsGroup ? Array.from(edgeLabelsGroup.querySelectorAll('g.edgeLabel')) : []; // Get as array
-    console.log(`Found ${labels.length} edge labels`);
+    // console.log(`Found ${labels.length} edge labels`);
 
     // Basic sanity check for order-based matching
     if (edges.length !== labels.length && labels.length > 0) {
@@ -178,7 +184,7 @@ function analyzeEdges(svg) {
     edges.forEach((edge, index) => {
         // Use index as a fallback if ID is missing, important for map key
         const edgeId = edge.id || `edge-index-${index}`;
-        console.log(`Analyzing Edge ${index}: ID='${edge.id || '(no id)'}' (Using map key: ${edgeId})`);
+        // console.log(`Analyzing Edge ${index}: ID='${edge.id || '(no id)'}' (Using map key: ${edgeId})`);
 
         // Extract source and target from the ID if possible (format: id_Animal_Dog_1)
         const idParts = edge.id ? edge.id.split('_') : [];
@@ -188,26 +194,26 @@ function analyzeEdges(svg) {
         if (idParts.length >= 3) {
             sourceName = idParts[1]; // e.g., "Animal"
             targetName = idParts[2]; // e.g., "Dog"
-            console.log(`  Extracted from ID: ${sourceName} -> ${targetName}`);
+            // console.log(`  Extracted from ID: ${sourceName} -> ${targetName}`);
         } else {
-            console.warn(`  WARN: Could not extract source/target names from edge ID '${edge.id}'. Node lookup might fail.`);
+            // console.warn(`  WARN: Could not extract source/target names from edge ID '${edge.id}'. Node lookup might fail.`);
         }
 
         // Find the corresponding node IDs - This part needs the names
         // If names couldn't be extracted, node lookup will likely fail here
         const sourceNodeId = Array.from(nodeMap.keys()).find(id => id && id.includes(sourceName));
         const targetNodeId = Array.from(nodeMap.keys()).find(id => id && id.includes(targetName));
-        console.log(`  Attempting node lookup for: ${sourceName} -> ${targetName}`);
-        console.log(`  Found node IDs: ${sourceNodeId || 'Not Found'} -> ${targetNodeId || 'Not Found'}`);
+        // console.log(`  Attempting node lookup for: ${sourceName} -> ${targetName}`);
+        // console.log(`  Found node IDs: ${sourceNodeId || 'Not Found'} -> ${targetNodeId || 'Not Found'}`);
 
         // --- Associate label based on index ---
         let correspondingLabel = null;
         if (index < labels.length) {
             correspondingLabel = labels[index];
-            const labelId = correspondingLabel.id || `label-index-${index}`; // Use index if ID missing
-            console.log(`  Associated label index ${index} (ID: '${correspondingLabel.id || '(no id)'}')`);
+            // const labelId = correspondingLabel.id || `label-index-${index}`; // Use index if ID missing
+            // console.log(`  Associated label index ${index} (ID: '${correspondingLabel.id || '(no id)'}')`);
         } else {
-            console.warn(`  WARN: No corresponding label found at index ${index} for edge ${edgeId}`);
+            // console.warn(`  WARN: No corresponding label found at index ${index} for edge ${edgeId}`);
         }
         // --- End label association ---
 
@@ -217,7 +223,7 @@ function analyzeEdges(svg) {
             const targetNode = nodeMap.get(targetNodeId);
 
             if (sourceNode && targetNode) {
-                console.log(`  SUCCESS: Linked edge ${edgeId} from ${sourceNodeId} to ${targetNodeId}`);
+                // console.log(`  SUCCESS: Linked edge ${edgeId} from ${sourceNodeId} to ${targetNodeId}`);
 
                 const originalD = edge.getAttribute('d');
                 const markerEnd = edge.getAttribute('marker-end');
@@ -235,16 +241,16 @@ function analyzeEdges(svg) {
                     initialTargetPos: getNodeCenterPosition(targetNode)
                 });
             } else {
-                 console.warn(`  WARN: Found node IDs (${sourceNodeId}, ${targetNodeId}) but couldn't retrieve nodes from map.`);
+                 // console.warn(`  WARN: Found node IDs (${sourceNodeId}, ${targetNodeId}) but couldn't retrieve nodes from map.`);
             }
         } else {
-            console.warn(`  WARN: Could not find matching node IDs for edge ${edgeId} (Names: ${sourceName}, ${targetName})`);
+            // console.warn(`  WARN: Could not find matching node IDs for edge ${edgeId} (Names: ${sourceName}, ${targetName})`);
             // Still store edge info even if nodes aren't found? Maybe not useful without nodes.
             // Let's only store if nodes are found.
         }
     });
 
-    console.log(`--- Edge analysis complete. ${edgeConnections.size} connections stored. ---`);
+    // console.log(`--- Edge analysis complete. ${edgeConnections.size} connections stored. ---`);
 }
 
 // Helper to get the center position of a node
@@ -279,7 +285,7 @@ function getNodeRect(node) {
 
 // Find intersection of a line with a rectangle 
 function findIntersection(rect, fromX, fromY, toX, toY) {
-    console.log(`Finding intersection: From (${fromX}, ${fromY}) to (${toX}, ${toY}) with rect (${rect.left}, ${rect.top}, ${rect.right}, ${rect.bottom})`);
+    // console.log(`Finding intersection: From (${fromX}, ${fromY}) to (${toX}, ${toY}) with rect (${rect.left}, ${rect.top}, ${rect.right}, ${rect.bottom})`);
     
     // Calculate direction vector
     const dx = toX - fromX;
@@ -289,7 +295,7 @@ function findIntersection(rect, fromX, fromY, toX, toY) {
     // in the direction of the target point
     if (fromX >= rect.left && fromX <= rect.right && 
         fromY >= rect.top && fromY <= rect.bottom) {
-        console.log("  Source point is inside rectangle, finding border intersection");
+        // console.log("  Source point is inside rectangle, finding border intersection");
         
         // Initialize for closest intersection
         let minDist = Infinity;
@@ -350,7 +356,7 @@ function findIntersection(rect, fromX, fromY, toX, toY) {
         }
         
         if (closestPoint) {
-            console.log(`  Found border intersection at (${closestPoint.x}, ${closestPoint.y})`);
+            // console.log(`  Found border intersection at (${closestPoint.x}, ${closestPoint.y})`);
             return closestPoint;
         }
     }
@@ -370,7 +376,7 @@ function findIntersection(rect, fromX, fromY, toX, toY) {
                 if (dist < minDist) {
                     minDist = dist;
                     closestPoint = { x: rect.left, y: y };
-                    console.log(`  Found intersection with left edge at (${rect.left}, ${y}), dist=${dist}`);
+                    // console.log(`  Found intersection with left edge at (${rect.left}, ${y}), dist=${dist}`);
                 }
             }
         }
@@ -386,7 +392,7 @@ function findIntersection(rect, fromX, fromY, toX, toY) {
                 if (dist < minDist) {
                     minDist = dist;
                     closestPoint = { x: rect.right, y: y };
-                    console.log(`  Found intersection with right edge at (${rect.right}, ${y}), dist=${dist}`);
+                    // console.log(`  Found intersection with right edge at (${rect.right}, ${y}), dist=${dist}`);
                 }
             }
         }
@@ -402,7 +408,7 @@ function findIntersection(rect, fromX, fromY, toX, toY) {
                 if (dist < minDist) {
                     minDist = dist;
                     closestPoint = { x: x, y: rect.top };
-                    console.log(`  Found intersection with top edge at (${x}, ${rect.top}), dist=${dist}`);
+                    // console.log(`  Found intersection with top edge at (${x}, ${rect.top}), dist=${dist}`);
                 }
             }
         }
@@ -418,17 +424,17 @@ function findIntersection(rect, fromX, fromY, toX, toY) {
                 if (dist < minDist) {
                     minDist = dist;
                     closestPoint = { x: x, y: rect.bottom };
-                    console.log(`  Found intersection with bottom edge at (${x}, ${rect.bottom}), dist=${dist}`);
+                    // console.log(`  Found intersection with bottom edge at (${x}, ${rect.bottom}), dist=${dist}`);
                 }
             }
         }
     }
     
     if (closestPoint) {
-        console.log(`  Closest intersection point: (${closestPoint.x}, ${closestPoint.y}), dist=${minDist}`);
+        // console.log(`  Closest intersection point: (${closestPoint.x}, ${closestPoint.y}), dist=${minDist}`);
         return closestPoint;
     } else {
-        console.log("  No intersection found with rectangle");
+        // console.log("  No intersection found with rectangle");
         // If no intersection is found, use the center of the closest edge
         const leftDist = Math.abs(rect.left - fromX);
         const rightDist = Math.abs(rect.right - fromX);
@@ -451,66 +457,87 @@ function findIntersection(rect, fromX, fromY, toX, toY) {
 }
 
 // Node dragging handlers
-function handleNodeMouseDown(e) {
-    // Only respond to RIGHT mouse button (button 2)
-    if (e.button !== 2) return;
-
+function handleNodeMouseDown(e, node) {
+    // Right-click check is done in the caller (SVG listener)
+    
     // Prevent the default context menu when right-clicking on a node
     e.preventDefault();
     // Prevent SVG pan-zoom from interfering when starting a node drag
     e.stopPropagation();
 
     const svg = mermaidOutput.querySelector('svg');
-    if (!svg) return;
+    const viewport = svg ? svg.querySelector('g.svg-pan-zoom_viewport') : null;
+    if (!svg || !viewport) {
+        console.error("SVG or viewport group not found!");
+        return;
+    }
     
     // Get current node transform
-    const transformAttr = this.getAttribute('transform') || 'translate(0,0)';
+    const transformAttr = node.getAttribute('transform') || 'translate(0,0)';
     const match = transformAttr.match(/translate\(\s*([^,)]+)(?:,\s*([^)]+))?\)/);
     const initialTransform = {
         x: parseFloat(match ? match[1] : 0) || 0,
         y: parseFloat(match ? match[2] : 0) || 0
     };
+
+    // Get CTM of the viewport group
+    const ctmInverse = viewport.getScreenCTM().inverse();
     
+    // console.log('[Drag Start]', { // Removed log
+    //     nodeId: node.id,
+    //     clientX: e.clientX, clientY: e.clientY,
+    //     viewportCTMInverse: ctmInverse,
+    //     initialTransform: initialTransform
+    // });
+
     // Initialize drag context
     dragContext = {
-        node: this,
+        node: node,
         initialTransform: initialTransform,
-        startClientX: e.clientX, // Store initial screen coordinates
-        startClientY: e.clientY
+        startClientX: e.clientX, // Store starting SCREEN coordinates
+        startClientY: e.clientY  // Store starting SCREEN coordinates
     };
     
     // Add a temporary class for styling
-    this.classList.add('dragging');
+    node.classList.add('dragging');
 }
 
 function handleNodeMouseMove(e) {
     if (!dragContext) return;
     
     const svg = mermaidOutput.querySelector('svg');
-    if (!svg) return;
+    const viewport = svg ? svg.querySelector('g.svg-pan-zoom_viewport') : null;
+    if (!svg || !viewport) {
+        // console.error("SVG or viewport group not found during move!"); // Keep error for potential future issues?
+        return;
+    }
     
-    // Get the CURRENT SVG's coordinate transformation matrix
-    const currentMatrixInverse = svg.getScreenCTM().inverse();
+    // Calculate delta in client (screen) coordinates
+    const deltaClientX = e.clientX - dragContext.startClientX;
+    const deltaClientY = e.clientY - dragContext.startClientY;
     
-    // Convert START client coordinates to CURRENT SVG coordinates
-    const startPoint = svg.createSVGPoint();
-    startPoint.x = dragContext.startClientX;
-    startPoint.y = dragContext.startClientY;
-    const svgStartPoint = startPoint.matrixTransform(currentMatrixInverse);
+    // Get the inverse of the VIEWPORT's screen CTM
+    const ctmInverse = viewport.getScreenCTM().inverse();
     
-    // Convert CURRENT client coordinates to CURRENT SVG coordinates
-    const currentPoint = svg.createSVGPoint();
-    currentPoint.x = e.clientX;
-    currentPoint.y = e.clientY;
-    const svgCurrentPoint = currentPoint.matrixTransform(currentMatrixInverse);
-    
-    // Calculate the delta in the CURRENT SVG coordinate system
-    const dx = svgCurrentPoint.x - svgStartPoint.x;
-    const dy = svgCurrentPoint.y - svgStartPoint.y;
-    
-    // Apply the new transform relative to the initial transform
-    const newX = dragContext.initialTransform.x + dx;
-    const newY = dragContext.initialTransform.y + dy;
+    // Transform the screen delta vector into an SVG delta vector
+    // Use the linear part of the inverse matrix (a, b, c, d) for scaling
+    const deltaSvgX = ctmInverse.a * deltaClientX + ctmInverse.c * deltaClientY;
+    const deltaSvgY = ctmInverse.b * deltaClientX + ctmInverse.d * deltaClientY;
+
+    // Apply the scaled SVG delta to the initial transform
+    const newX = dragContext.initialTransform.x + deltaSvgX;
+    const newY = dragContext.initialTransform.y + deltaSvgY;
+
+    // console.log('[Drag Move]', { // Removed log
+    //     nodeId: dragContext.node.id,
+    //     clientX: e.clientX, clientY: e.clientY,
+    //     deltaClient: { x: deltaClientX, y: deltaClientY },
+    //     viewportCTMInverse: ctmInverse,
+    //     deltaSvg: { x: deltaSvgX, y: deltaSvgY },
+    //     initialTransform: dragContext.initialTransform,
+    //     newTransform: { x: newX, y: newY }
+    // });
+
     dragContext.node.setAttribute('transform', `translate(${newX},${newY})`);
     
     // Update edges connected to this node
@@ -530,12 +557,12 @@ function handleNodeMouseUp() {
 // More robust edge update function
 function updateConnectedEdges(node) {
     if (!node || !node.id) return;
-    console.log(`Updating edges connected to node: ${node.id}`);
+    // console.log(`Updating edges connected to node: ${node.id}`);
     
     // Find all edges connected to this node
     edgeConnections.forEach((connection, edgeId) => {
         if (connection.source === node || connection.target === node) {
-            console.log(`  -> Updating edge: ${edgeId}`);
+            // console.log(`  -> Updating edge: ${edgeId}`);
             updateEdgePosition(connection);
         }
     });
@@ -581,12 +608,12 @@ function updateEdgePosition(connection) {
     const { edge, source, target, originalD, initialSourcePos, initialTargetPos, markerStart, markerEnd, label } = connection;
     
     if (!edge || !source || !target || !originalD) {
-        console.error("updateEdgePosition: Missing required connection data.");
+        // console.error("updateEdgePosition: Missing required connection data."); // Keep error?
         return;
     }
 
-    console.log(`  Updating position for edge between ${source.id} and ${target.id}`);
-    console.log(`  Edge has markerStart: ${markerStart || 'none'}, markerEnd: ${markerEnd || 'none'}`);
+    // console.log(`  Updating position for edge between ${source.id} and ${target.id}`);
+    // console.log(`  Edge has markerStart: ${markerStart || 'none'}, markerEnd: ${markerEnd || 'none'}`);
 
     // Get current source and target positions
     const sourceCenter = getNodeCenterPosition(source);
@@ -596,8 +623,8 @@ function updateEdgePosition(connection) {
     const sourceRect = getNodeRect(source);
     const targetRect = getNodeRect(target);
     
-    console.log("Source rect:", sourceRect);
-    console.log("Target rect:", targetRect);
+    // console.log("Source rect:", sourceRect);
+    // console.log("Target rect:", targetRect);
     
     // Find intersection points with rectangle edges
     const sourceIntersection = findIntersection(sourceRect, sourceCenter.x, sourceCenter.y, targetCenter.x, targetCenter.y);
@@ -607,8 +634,8 @@ function updateEdgePosition(connection) {
     let pathStart = sourceIntersection || sourceCenter;
     let pathEnd = targetIntersection || targetCenter;
     
-    console.log("Original source intersection:", pathStart);
-    console.log("Original target intersection:", pathEnd);
+    // console.log("Original source intersection:", pathStart);
+    // console.log("Original target intersection:", pathEnd);
     
     // Determine which end needs extra offset for arrow visibility
     const hasStartArrow = markerStart && markerStart.length > 0;
@@ -641,14 +668,14 @@ function updateEdgePosition(connection) {
             y: pathEnd.y - unitY * (hasEndArrow ? arrowTipOffset : regularOffset)
         };
         
-        console.log("Adjusted path start:", pathStart);
-        console.log("Adjusted path end:", pathEnd);
+        // console.log("Adjusted path start:", pathStart);
+        // console.log("Adjusted path end:", pathEnd);
     }
     
     // Update the edge's path (always from source to target)
     const newPath = `M${pathStart.x},${pathStart.y} L${pathEnd.x},${pathEnd.y}`;
     edge.setAttribute('d', newPath);
-    console.log(`    Set edge path to: ${newPath}`);
+    // console.log(`    Set edge path to: ${newPath}`);
 
     // --- Update Label Position ---
     if (label) {
@@ -664,7 +691,7 @@ function updateEdgePosition(connection) {
              // Need to handle potential errors if the element isn't rendered correctly yet
              labelBBox = label.getBBox();
         } catch (e) {
-            console.warn(`Could not get BBox for label ${label.id}: ${e.message}`);
+            // console.warn(`Could not get BBox for label ${label.id}: ${e.message}`); // Keep warning?
             // Use a default small size or skip positioning if BBox fails
             labelBBox = { width: 10, height: 5 }; // Fallback estimate
         }
@@ -675,7 +702,7 @@ function updateEdgePosition(connection) {
         const labelY = midY; // Place vertically centered on the line
 
         label.setAttribute('transform', `translate(${labelX}, ${labelY})`);
-        console.log(`    Set label ${label.id} transform to: translate(${labelX}, ${labelY})`);
+        // console.log(`    Set label ${label.id} transform to: translate(${labelX}, ${labelY})`);
     } else {
         // console.log(`    No label found for edge ${edge.id} to update.`);
     }
@@ -705,7 +732,7 @@ const renderMermaid = async () => {
         // Make nodes draggable
         makeNodesDraggable();
     } catch (error) {
-        console.error("Mermaid rendering error:", error);
+        // console.error("Mermaid rendering error:", error); // Keep error?
         // Display a user-friendly error message
         mermaidOutput.innerHTML = `<p style="color: red;">Error rendering diagram:</p><pre style="color: red; white-space: pre-wrap;">${error.message || error}</pre>`;
         // Add the invalid definition for context
@@ -781,5 +808,6 @@ darkModeToggle.addEventListener('change', () => {
 });
 
 // --- Future Enhancements Placeholder ---
-// Dragging nodes, panning, zooming will require more complex SVG manipulation
-// potentially using libraries like d3.js or svg-pan-zoom. 
+// Removed placeholder comment
+
+// console.log statements removed from the script. 
