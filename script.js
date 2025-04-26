@@ -7,11 +7,7 @@ const darkModeToggle = document.getElementById('darkModeToggle');
 // For tracking SVG pan-zoom instance
 let panZoomInstance = null;
 // For tracking draggable nodes
-let isDragging = false;
-let currentNode = null;
-let startX = 0;
-let startY = 0;
-let transform = null;
+let dragContext = null;
 // For tracking connection points
 let edgeConnections = new Map();
 
@@ -181,61 +177,72 @@ function handleNodeMouseDown(e) {
     
     // Prevent SVG pan-zoom from interfering
     e.stopPropagation();
-    isDragging = true;
-    currentNode = this;
     
-    // Find existing transform or create default one
-    const transformAttr = currentNode.getAttribute('transform') || 'translate(0,0)';
+    const svg = mermaidOutput.querySelector('svg');
+    if (!svg) return;
+    
+    // Get current node transform
+    const transformAttr = this.getAttribute('transform') || 'translate(0,0)';
     const match = transformAttr.match(/translate\(\s*([^,)]+)(?:,\s*([^)]+))?\)/);
+    const initialTransform = {
+        x: parseFloat(match ? match[1] : 0) || 0,
+        y: parseFloat(match ? match[2] : 0) || 0
+    };
     
-    if (match) {
-        transform = {
-            x: parseFloat(match[1]) || 0,
-            y: parseFloat(match[2]) || 0
-        };
-    } else {
-        transform = { x: 0, y: 0 };
-    }
-    
-    // Store starting point
-    startX = e.clientX;
-    startY = e.clientY;
+    // Initialize drag context
+    dragContext = {
+        node: this,
+        initialTransform: initialTransform,
+        startClientX: e.clientX, // Store initial screen coordinates
+        startClientY: e.clientY
+    };
     
     // Add a temporary class for styling
-    currentNode.classList.add('dragging');
+    this.classList.add('dragging');
 }
 
 function handleNodeMouseMove(e) {
-    if (!isDragging || !currentNode) return;
+    if (!dragContext) return;
     
-    // Calculate the new position
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
+    const svg = mermaidOutput.querySelector('svg');
+    if (!svg) return;
     
-    // Get zoom factor to adjust the movement
-    const zoomLevel = panZoomInstance ? panZoomInstance.getZoom() : 1;
+    // Get the CURRENT SVG's coordinate transformation matrix
+    const currentMatrixInverse = svg.getScreenCTM().inverse();
     
-    // Calculate new transformed position
-    const newX = transform.x + dx / zoomLevel;
-    const newY = transform.y + dy / zoomLevel;
+    // Convert START client coordinates to CURRENT SVG coordinates
+    const startPoint = svg.createSVGPoint();
+    startPoint.x = dragContext.startClientX;
+    startPoint.y = dragContext.startClientY;
+    const svgStartPoint = startPoint.matrixTransform(currentMatrixInverse);
     
-    // Apply the transform
-    currentNode.setAttribute('transform', `translate(${newX},${newY})`);
+    // Convert CURRENT client coordinates to CURRENT SVG coordinates
+    const currentPoint = svg.createSVGPoint();
+    currentPoint.x = e.clientX;
+    currentPoint.y = e.clientY;
+    const svgCurrentPoint = currentPoint.matrixTransform(currentMatrixInverse);
+    
+    // Calculate the delta in the CURRENT SVG coordinate system
+    const dx = svgCurrentPoint.x - svgStartPoint.x;
+    const dy = svgCurrentPoint.y - svgStartPoint.y;
+    
+    // Apply the new transform relative to the initial transform
+    const newX = dragContext.initialTransform.x + dx;
+    const newY = dragContext.initialTransform.y + dy;
+    dragContext.node.setAttribute('transform', `translate(${newX},${newY})`);
     
     // Update edges connected to this node
-    updateConnectedEdges(currentNode);
+    updateConnectedEdges(dragContext.node);
 }
 
 function handleNodeMouseUp() {
-    if (currentNode) {
-        currentNode.classList.remove('dragging');
-        
+    if (dragContext) {
+        dragContext.node.classList.remove('dragging');
         // Final update of connected edges
-        updateConnectedEdges(currentNode);
+        updateConnectedEdges(dragContext.node);
+        // Clear drag context
+        dragContext = null;
     }
-    
-    isDragging = false;
-    currentNode = null;
 }
 
 // More robust edge update function
