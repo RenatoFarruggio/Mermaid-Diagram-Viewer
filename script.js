@@ -66,6 +66,14 @@ const initializePanZoom = () => {
         const bbox = svg.getBBox();
         svg.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
     }
+
+    // Panning
+    let isPanning = false;
+    svg.addEventListener('mousedown', (e) => {
+        if (e.button === 2) isPanning = true;
+    });
+    svg.addEventListener('mouseup', () => isPanning = false);
+    svg.addEventListener('mouseleave', () => isPanning = false);
     
     // Create new instance
     panZoomInstance = svgPanZoom(svg, {
@@ -79,10 +87,7 @@ const initializePanZoom = () => {
         mouseWheelZoomEnabled: true,
         dblClickZoomEnabled: false,
         eventsListenerElement: svg.parentNode,
-        beforePan: function(oldPan, newPan) {
-            // Only allow panning when right mouse button is pressed
-            return window.event && window.event.buttons === 2 ? newPan : oldPan;
-        }
+        beforePan: () => isPanning
     });
     
     // Prevent context menu on right-click
