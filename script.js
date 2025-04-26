@@ -353,21 +353,44 @@ const renderMermaid = async () => {
     }
 };
 
-// Set default text and initial render
+// Set default text
 mermaidInput.value = defaultDiagram;
 
-// Initialize Mermaid
+// --- Initial Setup ---
+
+// 1. Determine initial theme
+let initialTheme = 'default';
+const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+if (prefersDark) {
+    initialTheme = 'dark';
+    // Update checkbox and body class if system prefers dark and checkbox isn't already checked
+    if (!darkModeToggle.checked) {
+        darkModeToggle.checked = true;
+        document.body.classList.add('dark-mode');
+    }
+} else {
+    // Ensure body class and checkbox match if system prefers light
+    if (darkModeToggle.checked) {
+        darkModeToggle.checked = false; // Should ideally not happen if HTML default is unchecked
+        document.body.classList.remove('dark-mode');
+    }
+}
+
+// 2. Initialize Mermaid ONCE with the determined theme
 mermaid.initialize({
-    startOnLoad: false, // We'll render manually
-    theme: document.body.classList.contains('dark-mode') ? 'dark' : 'default',
-    securityLevel: 'loose', // Needed for certain interactions with SVG
+    startOnLoad: false,
+    theme: initialTheme,
+    securityLevel: 'loose', // Needed for interactions
     class: {
-        // Potentially configure class diagram specifics if needed
+        // Class diagram specific configs if needed
     }
 });
 
-// Initial render
+// 3. Initial Render
 renderMermaid();
+
+// --- Event Listeners ---
 
 // Re-render on input change (with debounce)
 let debounceTimer;
@@ -376,40 +399,20 @@ mermaidInput.addEventListener('input', () => {
     debounceTimer = setTimeout(renderMermaid, 500); // Wait 500ms after last input
 });
 
-// Dark mode toggle
+// Dark mode toggle (handles re-initialization on change)
 darkModeToggle.addEventListener('change', () => {
     document.body.classList.toggle('dark-mode', darkModeToggle.checked);
-    // Re-initialize Mermaid with the new theme and re-render
+    const newTheme = darkModeToggle.checked ? 'dark' : 'default';
+    
+    // Re-initialize Mermaid with the new theme
     mermaid.initialize({
         startOnLoad: false,
-        theme: darkModeToggle.checked ? 'dark' : 'default',
+        theme: newTheme,
         securityLevel: 'loose'
     });
+    
     renderMermaid(); // Re-render with the new theme
 });
-
-// Apply initial dark mode based on system preference (optional)
-if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    if (!darkModeToggle.checked) {
-        darkModeToggle.checked = true;
-        document.body.classList.add('dark-mode');
-        // Initial theme setting if dark mode is preferred
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: 'dark',
-            securityLevel: 'loose'
-        });
-        renderMermaid(); // Re-render if theme changed on load
-    }
-} else {
-    // Ensure default theme if not dark mode preference
-     mermaid.initialize({
-        startOnLoad: false,
-        theme: 'default',
-        securityLevel: 'loose'
-    });
-    renderMermaid();
-}
 
 // --- Future Enhancements Placeholder ---
 // Dragging nodes, panning, zooming will require more complex SVG manipulation
