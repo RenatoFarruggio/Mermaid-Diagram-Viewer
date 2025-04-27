@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+When the user enters the "/commit" followed by referenced files, please consider the changes in all of them (except for cursor rules) to create a commit message. Then follow these rules @https://www.conventionalcommits.org/en/v1.0.0/.
+
+The changes are usually all changes since the beginning of the chat.
+
+Please avoid fancy words like "enhance". Also try to use specific verbs instead of general verbs.
+
+Please make each sentence complete the sentence "When applied, this commit will ...".
+
