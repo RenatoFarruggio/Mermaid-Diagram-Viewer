@@ -49,31 +49,41 @@ const cleanup = () => {
 
 // Initialize SVG pan-zoom for panning and zooming
 function initializePanZoom() {
+    console.log("[PanZoom Debug] Initializing Pan & Zoom...");
     const svg = mermaidOutput.querySelector('svg');
-    if (!svg) return;
-    
+    if (!svg) {
+        console.error("[PanZoom Debug] SVG element not found for pan/zoom.");
+        return;
+    }
+
     // Reset instance if exists
     if (panZoomInstance) {
+        console.log("[PanZoom Debug] Destroying existing panZoomInstance.");
         panZoomInstance.destroy();
+        panZoomInstance = null; // Ensure it's nulled out
     }
-    
+
     // Get the SVG dimensions and parent container dimensions
     const svgBBox = svg.getBBox();
     const containerWidth = mermaidOutput.clientWidth;
     const containerHeight = mermaidOutput.clientHeight;
-    
+    console.log("[PanZoom Debug] SVG BBox:", svgBBox);
+    console.log("[PanZoom Debug] Container Dimensions:", { width: containerWidth, height: containerHeight });
+
     // Calculate center point of the diagram
-    const centerX = svgBBox.x + svgBBox.width / 2;
-    const centerY = svgBBox.y + svgBBox.height / 2;
-    
+    // const centerX = svgBBox.x + svgBBox.width / 2;
+    // const centerY = svgBBox.y + svgBBox.height / 2;
+
     // Set an explicit viewBox centered on the diagram
-    const viewBoxWidth = Math.max(svgBBox.width * 1.1, containerWidth);
-    const viewBoxHeight = Math.max(svgBBox.height * 1.1, containerHeight);
-    const viewBoxX = centerX - viewBoxWidth / 2;
-    const viewBoxY = centerY - viewBoxHeight / 2;
-    
+    // const viewBoxWidth = Math.max(svgBBox.width * 1.1, containerWidth);
+    // const viewBoxHeight = Math.max(svgBBox.height * 1.1, containerHeight);
+    // const viewBoxX = centerX - viewBoxWidth / 2;
+    // const viewBoxY = centerY - viewBoxHeight / 2;
+
     // Apply the centered viewBox
-    svg.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
+    // svg.setAttribute('viewBox', `${viewBoxX} ${viewY} ${viewBoxWidth} ${viewBoxHeight}`);
+    // console.log("[PanZoom Debug] Manually set viewBox:", { x: viewBoxX, y: viewBoxY, width: viewBoxWidth, height: viewBoxHeight });
+
 
     // Panning state - needs to be accessible by the listener
     let isPanning = false;
@@ -111,27 +121,54 @@ function initializePanZoom() {
     });
 
     // Create new instance, using the isPanning flag in beforePan
-    panZoomInstance = svgPanZoom(svg, {
+    const panZoomOptions = {
         zoomEnabled: true,
         controlIconsEnabled: false,
-        fit: true,
-        center: true,
-        minZoom: 0.1,
-        maxZoom: 10,
+        center: true, // Re-enabled for initial view
+        minZoom: 0.05, // Allow zooming out further
+        maxZoom: 1,    // Limit zooming in
         zoomScaleSensitivity: 0.3,
         mouseWheelZoomEnabled: true,
         dblClickZoomEnabled: false,
-        beforePan: () => isPanning // Control panning based on our flag
-    });
-    
+        beforePan: () => isPanning, // Control panning based on our flag
+        onZoom: function(newZoom) {
+            console.log(`[PanZoom Debug] Zoom event: New zoom level = ${newZoom}`);
+            if (panZoomInstance) {
+                const currentPan = panZoomInstance.getPan();
+                console.log(`[PanZoom Debug]   Current pan: x=${currentPan.x}, y=${currentPan.y}`);
+            }
+        },
+        onPan: function(newPan) {
+            console.log(`[PanZoom Debug] Pan event: New pan = x=${newPan.x}, y=${newPan.y}`);
+            if (panZoomInstance) {
+                const currentZoom = panZoomInstance.getZoom();
+                console.log(`[PanZoom Debug]   Current zoom: ${currentZoom}`);
+            }
+        },
+        onUpdatedCTM: function(newCTM) {
+             // console.log("[PanZoom Debug] Updated CTM:", newCTM); // This might be too verbose
+        }
+    };
+    console.log("[PanZoom Debug] Initializing svgPanZoom with options:", panZoomOptions);
+
+    panZoomInstance = svgPanZoom(svg, panZoomOptions);
+
     // Force center and fit once the pan-zoom is initialized
     setTimeout(() => {
         if (panZoomInstance) {
-            panZoomInstance.center();
-            panZoomInstance.fit();
+            console.log("[PanZoom Debug] Applying initial center() and setting initial zoom.");
+            panZoomInstance.center(); // Center it first
+            const initialZoomLevel = 0.8; // Set desired initial zoom (less than 1)
+            panZoomInstance.zoom(initialZoomLevel);
+            console.log(`[PanZoom Debug] Initial center/zoom complete. Final state:`, {
+                zoom: panZoomInstance.getZoom(),
+                pan: panZoomInstance.getPan()
+            });
+        } else {
+            console.warn("[PanZoom Debug] panZoomInstance not available for initial center/zoom timeout.");
         }
-    }, 100);
-    
+    }, 150); // Slightly longer timeout to ensure centering is done
+
     // Prevent the default context menu on the SVG element for all right-clicks
     svg.addEventListener('contextmenu', e => {
         e.preventDefault();

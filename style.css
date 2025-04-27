@@ -89,13 +89,13 @@ body.dark-mode .key {
     padding: 20px;
     background-color: #fff;
     border-radius: 4px;
-    min-height: 800px;
+    /*min-height: 800px;*/
     width: 100%;
     box-sizing: border-box;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: visible;
+    /* display: flex; */ /* Removed for testing pan/zoom */
+    /* justify-content: center; */ /* Removed for testing pan/zoom */
+    /* align-items: center; */ /* Removed for testing pan/zoom */
+    overflow: visible; /* Keep this to allow SVG overflow */
     position: relative;
 }
 
@@ -115,7 +115,7 @@ body.dark-mode #mermaidOutput {
 
 /* Ensure the SVG viewport can extend beyond container */
 #mermaidOutput svg > g {
-    transform-origin: center;
+    /* transform-origin: center; */ /* Removed for testing pan/zoom */
     width: 100%;
     height: 100%;
 }
