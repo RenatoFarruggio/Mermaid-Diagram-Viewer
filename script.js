@@ -16,18 +16,18 @@ let dragContext = null;
 let edgeConnections = new Map();
 
 const defaultDiagram = `classDiagram
-class Animal {
-    +String species
-    +makeSound()
-}
-class Dog {
-    +bark()
-}
-class Cat {
-    +meow()
-}
-Animal --o Dog : has
-Animal <|-- Cat : is
+    class Animal {
+        +String species
+        +makeSound()
+    }
+    class Dog {
+        +bark()
+    }
+    class Cat {
+        +meow()
+    }
+    Animal --o Dog : has
+    Animal <|-- Cat : is
 `;
 
 // Cleanup function for previous event listeners and instances
