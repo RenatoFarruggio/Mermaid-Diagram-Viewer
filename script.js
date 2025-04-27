@@ -3,6 +3,10 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.mi
 const mermaidInput = document.getElementById('mermaidInput');
 const mermaidOutput = document.getElementById('mermaidOutput');
 const darkModeToggle = document.getElementById('darkModeToggle');
+const curveToggle = document.getElementById('curveToggle');
+
+// State variable for edge style
+let useCurvedEdges = curveToggle.checked;
 
 // For tracking SVG pan-zoom instance
 let panZoomInstance = null;
@@ -663,105 +667,164 @@ function getTransformedBoundaryPoints(rect, transform) {
 function updateEdgePosition(connection) {
     const { edge, source, target, originalD, initialSourcePos, initialTargetPos, markerStart, markerEnd, label } = connection;
     
-    if (!edge || !source || !target || !originalD) {
-        // console.error("updateEdgePosition: Missing required connection data."); // Keep error?
+    if (!edge || !source || !target /* Removed originalD check as it's not needed here */) {
+        // console.error("updateEdgePosition: Missing required connection data.");
         return;
     }
 
-    // console.log(`  Updating position for edge between ${source.id} and ${target.id}`);
-    // console.log(`  Edge has markerStart: ${markerStart || 'none'}, markerEnd: ${markerEnd || 'none'}`);
-
-    // Get current source and target positions
+    // Get current source and target positions & rectangles
     const sourceCenter = getNodeCenterPosition(source);
     const targetCenter = getNodeCenterPosition(target);
-    
-    // Get current node rectangles with transforms applied
     const sourceRect = getNodeRect(source);
     const targetRect = getNodeRect(target);
     
-    // console.log("Source rect:", sourceRect);
-    // console.log("Target rect:", targetRect);
-    
-    // Find intersection points with rectangle edges
+    // Find intersection points
     const sourceIntersection = findIntersection(sourceRect, sourceCenter.x, sourceCenter.y, targetCenter.x, targetCenter.y);
     const targetIntersection = findIntersection(targetRect, targetCenter.x, targetCenter.y, sourceCenter.x, sourceCenter.y);
     
-    // If we couldn't find intersections, use the centers
     let pathStart = sourceIntersection || sourceCenter;
     let pathEnd = targetIntersection || targetCenter;
     
-    // console.log("Original source intersection:", pathStart);
-    // console.log("Original target intersection:", pathEnd);
-    
-    // Determine which end needs extra offset for arrow visibility
     const hasStartArrow = markerStart && markerStart.length > 0;
     const hasEndArrow = markerEnd && markerEnd.length > 0;
     
-    // Calculate direction vector
+    // Calculate direct vector (used for both straight and curved logic)
     const dx = pathEnd.x - pathStart.x;
     const dy = pathEnd.y - pathStart.y;
     const length = Math.sqrt(dx * dx + dy * dy);
     
-    // Only add offset if the points aren't too close together
-    if (length > 10) {
-        // Unit vector in the direction of the line
-        const unitX = dx / length;
-        const unitY = dy / length;
-        
-        // Use different offsets for start and end
-        const regularOffset = 5;     // Regular offset (non-arrow end)
-        const arrowTipOffset = 20;   // Arrow tip needs more space to be fully visible
-        
-        // Apply offset to start point - bigger offset if there's a start arrow
-        pathStart = {
-            x: pathStart.x + unitX * (hasStartArrow ? arrowTipOffset : regularOffset),
-            y: pathStart.y + unitY * (hasStartArrow ? arrowTipOffset : regularOffset)
-        };
-        
-        // Apply offset to end point - bigger offset if there's an end arrow
-        pathEnd = {
-            x: pathEnd.x - unitX * (hasEndArrow ? arrowTipOffset : regularOffset),
-            y: pathEnd.y - unitY * (hasEndArrow ? arrowTipOffset : regularOffset)
-        };
-        
-        // console.log("Adjusted path start:", pathStart);
-        // console.log("Adjusted path end:", pathEnd);
-    }
-    
-    // Update the edge's path (always from source to target)
-    const newPath = `M${pathStart.x},${pathStart.y} L${pathEnd.x},${pathEnd.y}`;
-    edge.setAttribute('d', newPath);
-    // console.log(`    Set edge path to: ${newPath}`);
-
-    // --- Update Label Position ---
+    let newPath;
+    let labelX, labelY;
+    let labelBBox = { width: 10, height: 5 }; // Default/fallback
     if (label) {
-        // Calculate the midpoint of the *adjusted* edge segment
+        try {
+            labelBBox = label.getBBox();
+        } catch (e) { /* console.warn(`Could not get BBox for label ${label.id}: ${e.message}`); */ }
+    }
+
+    // --- Conditional Path and Label Logic ---
+    if (useCurvedEdges && length > 0) { // Apply curve logic
         const midX = (pathStart.x + pathEnd.x) / 2;
         const midY = (pathStart.y + pathEnd.y) / 2;
+        
+        const standardPerpX = -dy;
+        const standardPerpY = dx;
 
-        // Get the label's bounding box to help center it
-        // Note: getBBox() might not work perfectly if the label itself has transforms.
-        // If labels are complex, this might need adjustment.
-        let labelBBox = { width: 0, height: 0 };
-        try {
-             // Need to handle potential errors if the element isn't rendered correctly yet
-             labelBBox = label.getBBox();
-        } catch (e) {
-            // console.warn(`Could not get BBox for label ${label.id}: ${e.message}`); // Keep warning?
-            // Use a default small size or skip positioning if BBox fails
-            labelBBox = { width: 10, height: 5 }; // Fallback estimate
+        let perpX, perpY;
+        const isMoreVertical = Math.abs(dy) >= Math.abs(dx);
+        let useStandardPerp = true;
+
+        if (dx >= 0 && dy < 0) { 
+            if (isMoreVertical) useStandardPerp = false;
+        } else if (dx >= 0 && dy >= 0) { 
+            if (!isMoreVertical) useStandardPerp = false;
+        } else if (dx < 0 && dy >= 0) { 
+            if (isMoreVertical) useStandardPerp = false;
+        } else { 
+            if (!isMoreVertical) useStandardPerp = false;
+        }
+        
+        if (useStandardPerp) {
+            perpX = -standardPerpX; 
+            perpY = -standardPerpY;
+        } else {
+            perpX = standardPerpX; 
+            perpY = standardPerpY; 
         }
 
-        // Apply translate transform to the label group
-        // Center the label based on its bounding box
-        const labelX = midX - labelBBox.width / 2;
-        const labelY = midY; // Place vertically centered on the line
+        const perpLength = Math.sqrt(perpX * perpX + perpY * perpY);
+        const normPerpX = perpLength === 0 ? 0 : perpX / perpLength;
+        const normPerpY = perpLength === 0 ? 0 : perpY / perpLength;
+        
+        const curveFactor = 0.15; 
+        const minOffset = 5;
+        const maxOffset = 50;
+        const curveOffset = Math.max(minOffset, Math.min(maxOffset, length * curveFactor));
 
-        label.setAttribute('transform', `translate(${labelX}, ${labelY})`);
-        // console.log(`    Set label ${label.id} transform to: translate(${labelX}, ${labelY})`);
-    } else {
-        // console.log(`    No label found for edge ${edge.id} to update.`);
+        const controlX = midX + normPerpX * curveOffset;
+        const controlY = midY + normPerpY * curveOffset;
+
+        // Adjust endpoints for arrows along the curve
+        if (length > 10) {
+            const regularOffset = 5;
+            const arrowTipOffset = 20;
+
+            const dxStartCtrl = controlX - pathStart.x;
+            const dyStartCtrl = controlY - pathStart.y;
+            const lenStartCtrl = Math.sqrt(dxStartCtrl * dxStartCtrl + dyStartCtrl * dyStartCtrl);
+            const unitStartX = lenStartCtrl === 0 ? 0 : dxStartCtrl / lenStartCtrl;
+            const unitStartY = lenStartCtrl === 0 ? 0 : dyStartCtrl / lenStartCtrl;
+            
+            pathStart = {
+                x: pathStart.x + unitStartX * (hasStartArrow ? arrowTipOffset : regularOffset),
+                y: pathStart.y + unitStartY * (hasStartArrow ? arrowTipOffset : regularOffset)
+            };
+
+            const dxCtrlEnd = pathEnd.x - controlX;
+            const dyCtrlEnd = pathEnd.y - controlY;
+            const lenCtrlEnd = Math.sqrt(dxCtrlEnd * dxCtrlEnd + dyCtrlEnd * dyCtrlEnd);
+            const unitEndX = lenCtrlEnd === 0 ? 0 : dxCtrlEnd / lenCtrlEnd;
+            const unitEndY = lenCtrlEnd === 0 ? 0 : dyCtrlEnd / lenCtrlEnd;
+            
+            pathEnd = {
+                x: pathEnd.x - unitEndX * (hasEndArrow ? arrowTipOffset : regularOffset),
+                y: pathEnd.y - unitEndY * (hasEndArrow ? arrowTipOffset : regularOffset)
+            };
+        }
+        
+        newPath = `M${pathStart.x},${pathStart.y} Q${controlX},${controlY} ${pathEnd.x},${pathEnd.y}`;
+
+        // Label position for curve
+        if (label) {
+            const labelOffsetX = normPerpX * (labelBBox.height / 2 + 2); 
+            const labelOffsetY = normPerpY * (labelBBox.height / 2 + 2); 
+            labelX = controlX + labelOffsetX - labelBBox.width / 2;
+            labelY = controlY + labelOffsetY; 
+        }
+
+    } else { // Apply straight line logic
+        // Adjust endpoints for arrows along the straight line
+        if (length > 10) {
+            const regularOffset = 5;
+            const arrowTipOffset = 20;
+            const unitX = dx / length;
+            const unitY = dy / length;
+
+            pathStart = {
+                x: pathStart.x + unitX * (hasStartArrow ? arrowTipOffset : regularOffset),
+                y: pathStart.y + unitY * (hasStartArrow ? arrowTipOffset : regularOffset)
+            };
+            pathEnd = {
+                x: pathEnd.x - unitX * (hasEndArrow ? arrowTipOffset : regularOffset),
+                y: pathEnd.y - unitY * (hasEndArrow ? arrowTipOffset : regularOffset)
+            };
+        }
+        
+        newPath = `M${pathStart.x},${pathStart.y} L${pathEnd.x},${pathEnd.y}`;
+        
+        // Label position for straight line (midpoint)
+        if (label) {
+            const midX = (pathStart.x + pathEnd.x) / 2;
+            const midY = (pathStart.y + pathEnd.y) / 2;
+            labelX = midX - labelBBox.width / 2;
+            labelY = midY; // Place vertically centered on the line
+        }
     }
+    // --- End Conditional Logic ---
+    
+    edge.setAttribute('d', newPath);
+
+    // --- Update Label Position (Common) ---
+    if (label) {
+        label.setAttribute('transform', `translate(${labelX}, ${labelY})`);
+    } 
+}
+
+// Helper function to redraw all edges based on current setting
+function redrawAllEdges() {
+    edgeConnections.forEach(connection => {
+        updateEdgePosition(connection);
+    });
 }
 
 // Function to render the Mermaid diagram
@@ -861,6 +924,12 @@ darkModeToggle.addEventListener('change', () => {
     });
     
     renderMermaid(); // Re-render with the new theme
+});
+
+// Curve toggle handler
+curveToggle.addEventListener('change', () => {
+    useCurvedEdges = curveToggle.checked;
+    redrawAllEdges(); // Update existing edges
 });
 
 // --- Future Enhancements Placeholder ---
