@@ -89,30 +89,35 @@ function initializePanZoom() {
     let isPanning = false;
 
     svg.addEventListener('mousedown', (e) => {
-        // Handle RIGHT clicks only for panning or node dragging
-        if (e.button === 2) {
+        // Handle MIDDLE clicks for panning, LEFT clicks for node dragging
+        if (e.button === 1) { // Middle mouse button
+            isPanning = true;
+            e.preventDefault(); // Prevent default middle-click scroll behavior
+        } else if (e.button === 0) { // Left mouse button
             const targetNode = e.target.closest('g.node');
             if (targetNode) {
-                // Right-clicked on a node, initiate drag
+                // Left-clicked on a node, initiate drag
                 isPanning = false; // Ensure panning is disabled
                 handleNodeMouseDown(e, targetNode); // Manually call handler
             } else {
-                // Right-clicked on background, allow panning
-                isPanning = true;
+                // Left-clicked on background, do nothing
+                isPanning = false;
             }
+            // Prevent context menu for right-clicks always
+            //e.preventDefault();
         } else {
-            // Other clicks (left/middle) should not interfere
+            // Other clicks (right) should not interfere
             isPanning = false;
         }
     });
-    
-    svg.addEventListener('mouseup', () => {
-        if (isPanning) {
+
+    svg.addEventListener('mouseup', (e) => {
+        if (e.button === 1 && isPanning) { // Middle mouse button release
             isPanning = false;
         }
-        // Note: Node drag mouseup is handled by the document listener
+        // Note: Node drag mouseup (left-click) is handled by the document listener
     });
-    
+
     svg.addEventListener('mouseleave', () => {
          if (isPanning) {
              isPanning = false;
@@ -167,13 +172,7 @@ function initializePanZoom() {
         } else {
             console.warn("[PanZoom Debug] panZoomInstance not available for initial center/zoom timeout.");
         }
-    }, 150); // Slightly longer timeout to ensure centering is done
-
-    // Prevent the default context menu on the SVG element for all right-clicks
-    svg.addEventListener('contextmenu', e => {
-        e.preventDefault();
-        return false;
-    });
+    }, 150); // Timeout to ensure centering is done
 }
 
 // Make nodes draggable
