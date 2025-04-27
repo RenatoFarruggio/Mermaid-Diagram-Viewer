@@ -89,11 +89,8 @@ function initializePanZoom() {
     let isPanning = false;
 
     svg.addEventListener('mousedown', (e) => {
-        // Handle MIDDLE clicks for panning, LEFT clicks for node dragging
-        if (e.button === 1) { // Middle mouse button
-            isPanning = true;
-            e.preventDefault(); // Prevent default middle-click scroll behavior
-        } else if (e.button === 0) { // Left mouse button
+        // Handle LEFT clicks for node dragging, MIDDLE clicks for panning
+        if (e.button === 0) { // Left mouse button
             const targetNode = e.target.closest('g.node');
             if (targetNode) {
                 // Left-clicked on a node, initiate drag
@@ -105,6 +102,9 @@ function initializePanZoom() {
             }
             // Prevent context menu for right-clicks always
             //e.preventDefault();
+        } else if (e.button === 1) { // Middle mouse button
+            isPanning = true;
+            e.preventDefault(); // Prevent default middle-click scroll behavior
         } else {
             // Other clicks (right) should not interfere
             isPanning = false;
