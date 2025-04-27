@@ -163,7 +163,7 @@ function initializePanZoom() {
         if (panZoomInstance) {
             console.log("[PanZoom Debug] Applying initial center() and setting initial zoom.");
             panZoomInstance.center(); // Center it first
-            const initialZoomLevel = 0.8; // Set desired initial zoom (less than 1)
+            const initialZoomLevel = 0.2; // Set desired initial zoom
             panZoomInstance.zoom(initialZoomLevel);
             console.log(`[PanZoom Debug] Initial center/zoom complete. Final state:`, {
                 zoom: panZoomInstance.getZoom(),
